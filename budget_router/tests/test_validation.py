@@ -14,6 +14,7 @@ from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, ActionType
 from budget_router.policies import (
     always_route_a_policy,
+    always_route_b_policy,
     always_route_c_policy,
     always_shed_load_policy,
     debug_upper_bound_policy,
@@ -95,6 +96,7 @@ class TestValidation:
             "heuristic_baseline": heuristic_baseline_policy,
             "upper_bound": debug_upper_bound_policy,
             "always_route_a": always_route_a_policy,
+            "always_route_b": always_route_b_policy,
             "always_route_c": always_route_c_policy,
             "always_shed_load": always_shed_load_policy,
         }
@@ -122,4 +124,17 @@ class TestValidation:
             assert abs(heldout_mean - dev_mean) <= margin, (
                 f"Baseline unstable on {scenario.name}: "
                 f"dev={dev_mean:.2f}, heldout={heldout_mean:.2f}, margin={margin:.2f}"
+            )
+
+    def test_baseline_beats_always_route_b_dev(self):
+        """Baseline beats always_route_b on all tasks across development seeds."""
+        for scenario in [EASY, MEDIUM, HARD]:
+            baseline_mean, _ = mean_reward_over_seeds(
+                heuristic_baseline_policy, scenario, DEVELOPMENT_SEEDS
+            )
+            always_b_mean, _ = mean_reward_over_seeds(
+                always_route_b_policy, scenario, DEVELOPMENT_SEEDS
+            )
+            assert baseline_mean >= always_b_mean, (
+                f"baseline ({baseline_mean:.2f}) < always_route_b ({always_b_mean:.2f}) on {scenario.name}"
             )

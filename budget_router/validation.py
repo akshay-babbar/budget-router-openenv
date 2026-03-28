@@ -17,6 +17,7 @@ from .environment import BudgetRouterEnv
 from .models import Action, ActionType, InternalState, Observation, TaskConfig
 from .policies import (
     always_route_a_policy,
+    always_route_b_policy,
     always_route_c_policy,
     always_shed_load_policy,
     debug_upper_bound_policy,
@@ -92,6 +93,7 @@ def run_validation(seed_set_name: str = "development") -> Dict[str, Dict[str, Di
         "heuristic_baseline": heuristic_baseline_policy,
         "upper_bound": debug_upper_bound_policy,
         "always_route_a": always_route_a_policy,
+        "always_route_b": always_route_b_policy,
         "always_route_c": always_route_c_policy,
         "always_shed_load": always_shed_load_policy,
     }
@@ -315,11 +317,16 @@ def assert_all_checks(
     for task in ["easy", "medium", "hard"]:
         baseline_mean = dev_results[task]["heuristic_baseline"]["mean_reward"]
         always_a_mean = dev_results[task]["always_route_a"]["mean_reward"]
+        always_b_mean = dev_results[task]["always_route_b"]["mean_reward"]
         always_shed_mean = dev_results[task]["always_shed_load"]["mean_reward"]
 
         check(
             baseline_mean >= always_a_mean,
             f"[dev/{task}] baseline ({baseline_mean:.2f}) >= always_a ({always_a_mean:.2f})",
+        )
+        check(
+            baseline_mean >= always_b_mean,
+            f"[dev/{task}] baseline ({baseline_mean:.2f}) >= always_b ({always_b_mean:.2f})",
         )
         check(
             baseline_mean >= always_shed_mean,
@@ -330,10 +337,16 @@ def assert_all_checks(
     for task in ["easy", "medium", "hard"]:
         baseline_mean = dev_results[task]["heuristic_baseline"]["mean_reward"]
         always_a = dev_results[task]["always_route_a"]["mean_reward"]
+        always_b = dev_results[task]["always_route_b"]["mean_reward"]
         always_c = dev_results[task]["always_route_c"]["mean_reward"]
         always_shed = dev_results[task]["always_shed_load"]["mean_reward"]
         check(
-            not (always_a >= baseline_mean and always_c >= baseline_mean and always_shed >= baseline_mean),
+            not (
+                always_a >= baseline_mean
+                and always_b >= baseline_mean
+                and always_c >= baseline_mean
+                and always_shed >= baseline_mean
+            ),
             f"[dev/{task}] heuristic provides strategic advantage over degenerate policies",
         )
 

@@ -13,6 +13,7 @@ from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, ActionType, Observation
 from budget_router.policies import (
     always_route_a_policy,
+    always_route_b_policy,
     always_route_c_policy,
     always_shed_load_policy,
     heuristic_baseline_policy,
@@ -267,6 +268,32 @@ class TestDegeneratePolicySanity:
 
         assert baseline_total >= always_c_total, (
             f"always_route_c ({always_c_total:.2f}) dominates baseline ({baseline_total:.2f}) overall"
+        )
+
+    def test_always_route_b_does_not_dominate_baseline_medium(self):
+        """always_route_b does not dominate heuristic baseline on medium across dev seeds."""
+        env = BudgetRouterEnv()
+        seeds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+        baseline_rewards = []
+        always_b_rewards = []
+
+        for seed in seeds:
+            _, rewards, _, _ = run_full_episode(
+                env, heuristic_baseline_policy, seed=seed, scenario=MEDIUM
+            )
+            baseline_rewards.append(sum(r or 0 for r in rewards))
+
+            _, rewards, _, _ = run_full_episode(
+                env, always_route_b_policy, seed=seed, scenario=MEDIUM
+            )
+            always_b_rewards.append(sum(r or 0 for r in rewards))
+
+        baseline_mean = sum(baseline_rewards) / len(baseline_rewards)
+        always_b_mean = sum(always_b_rewards) / len(always_b_rewards)
+
+        assert baseline_mean >= always_b_mean, (
+            f"always_route_b ({always_b_mean:.2f}) dominates baseline ({baseline_mean:.2f}) on medium"
         )
 
     def test_always_shed_load_worse_than_baseline_easy(self):

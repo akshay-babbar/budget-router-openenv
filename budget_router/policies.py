@@ -6,6 +6,7 @@ Policies for the Budget Router environment.
 - heuristic_baseline_policy: stateless cheapest-viable routing
 - debug_upper_bound_policy: oracle with internal state access (test only)
 - always_route_a_policy: degenerate (always cheapest)
+- always_route_b_policy: degenerate (always balanced fallback)
 - always_route_c_policy: degenerate (always most reliable)
 - always_shed_load_policy: degenerate (always shed)
 """
@@ -33,11 +34,7 @@ def heuristic_baseline_policy(obs: Observation) -> Action:
     Budget-aware: if budget is low, prefer cheaper providers more aggressively.
     No privileged information. Uses only what the agent can observe.
     """
-    threshold = 0.5
-
-    # If budget is getting low, be less picky about provider quality
-    if obs.budget_remaining < 0.3:
-        threshold = 0.3
+    threshold = 0.52
 
     # Providers ordered by cost (cheapest first): A, B, C
     providers = [
@@ -115,6 +112,11 @@ def debug_upper_bound_policy(obs: Observation, internal_state: InternalState) ->
 def always_route_a_policy(obs: Observation) -> Action:
     """Degenerate: always route to cheapest provider A."""
     return Action(action=ActionType.ROUTE_TO_A)
+
+
+def always_route_b_policy(obs: Observation) -> Action:
+    """Degenerate: always route to balanced provider B."""
+    return Action(action=ActionType.ROUTE_TO_B)
 
 
 def always_route_c_policy(obs: Observation) -> Action:
