@@ -1,3 +1,13 @@
 .venv/
+__pycache__/
 *.pyc
-budget_router/__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+.env
+.DS_Store
+*.egg-info/
+dist/
+build/
+*.png

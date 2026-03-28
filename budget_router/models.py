@@ -171,10 +171,15 @@ class TaskConfig:
     # SLA
     sla_ceiling_ms: float = 500.0
 
-    # Degradation config
+    # Degradation config (primary)
     degradation_start_step: int = 0  # step at which degradation begins
     degradation_rate: float = 0.0  # health reduction per step for provider A
     degradation_target: str = "A"  # which provider degrades
+
+    # Secondary degradation (for multi-provider scenarios)
+    secondary_degradation_start_step: int = 999  # 999 = no secondary degradation
+    secondary_degradation_rate: float = 0.0
+    secondary_degradation_target: str = ""  # empty = no secondary degradation
 
     # Episode
     max_steps: int = 20

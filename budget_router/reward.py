@@ -10,6 +10,9 @@ import math
 from typing import Any, Dict, List
 
 
+BUDGET_WEIGHT = 5.0  # Scales cost penalty so it's meaningful vs success/failure signal
+
+
 def step_reward(
     action_type: str,
     request_succeeded: bool,
@@ -24,7 +27,7 @@ def step_reward(
     For shed_load: fixed penalty of -0.5 (replaces routing terms).
     For routing actions:
       +1.0 if request succeeded, -2.0 if failed
-      -(provider_cost / initial_budget) as cost penalty
+      -(provider_cost / initial_budget) * BUDGET_WEIGHT as cost penalty
       -(excess_latency / sla_ceiling_ms) if latency exceeds SLA
 
     Returns:
@@ -49,7 +52,7 @@ def step_reward(
         reward += -2.0
 
     # Term 2: Cost penalty (always applied for routing actions)
-    cost_penalty = -(provider_cost / initial_budget)
+    cost_penalty = -(provider_cost / initial_budget) * BUDGET_WEIGHT
     reward += cost_penalty
 
     # Term 3: Latency breach penalty
@@ -129,6 +132,7 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
             "latency_score": 0.0,
             "budget_score": 0.0,
             "sla_score": 0.0,
+            "adaptation_score": 0.0,
         }
 
     metrics = episode_metrics(history)
@@ -150,16 +154,28 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
     else:
         sla_score = 1.0
 
+    # Budget score: penalize spending relative to initial budget, not theoretical max
     total_cost = float(metrics.get("total_cost_spent", 0.0))
-    max_cost_per_request = 0.10
-    max_cost = max(1.0e-9, max_cost_per_request * max(1, len(routing_steps)))
-    budget_score = 1.0 - min(1.0, total_cost / max_cost)
+    initial_budget = float(history[0].get("initial_budget", 1.0) or 1.0)
+    budget_score = max(0.0, 1.0 - total_cost / initial_budget)
+
+    # Adaptation score: measures post-degradation success rate.
+    # Directly measures whether the agent detected and adapted to degradation.
+    adaptation_score = 0.0
+    degradation_start = int(history[0].get("degradation_start_step", 999) or 999)
+    if degradation_start < 999:
+        post_degrade = [h for h in history if h.get("action_type") != "shed_load"
+                        and int(h.get("step", 0)) > degradation_start]
+        if post_degrade:
+            post_successes = sum(1 for h in post_degrade if h.get("request_succeeded", False))
+            adaptation_score = post_successes / len(post_degrade)
 
     overall = (
-        0.4 * success_score
+        0.3 * success_score
         + 0.2 * latency_score
-        + 0.2 * budget_score
-        + 0.2 * sla_score
+        + 0.15 * budget_score
+        + 0.15 * sla_score
+        + 0.2 * adaptation_score
     )
 
     overall = max(0.0, min(1.0, overall))
@@ -169,4 +185,5 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
         "latency_score": round(max(0.0, min(1.0, latency_score)), 4),
         "budget_score": round(max(0.0, min(1.0, budget_score)), 4),
         "sla_score": round(max(0.0, min(1.0, sla_score)), 4),
+        "adaptation_score": round(max(0.0, min(1.0, adaptation_score)), 4),
     }
