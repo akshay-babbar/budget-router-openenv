@@ -157,6 +157,17 @@ Two deterministic evaluation utilities in `budget_router/reward.py`:
 
 The adaptation score is the key differentiator: it measures performance *after* degradation begins, rewarding agents that detect and respond to non-stationarity.
 
+### Grader example output
+
+```python
+from budget_router.reward import grade_episode
+# After running an episode, pass env._internal.history:
+scores = grade_episode(history)
+# Returns: {"overall_score": 0.72, "success_score": 0.85, "latency_score": 0.68,
+#           "budget_score": 0.55, "sla_score": 0.90, "adaptation_score": 0.60}
+# All scores clamped to [0.0, 1.0]
+```
+
 ## Task Presets (exact values in code)
 
 Defined in `budget_router/tasks.py`:
@@ -210,7 +221,15 @@ The validation harness (`budget_router/validation.py`) runs these policies acros
   - `MODEL_NAME`
   - `HF_TOKEN`
 
-It writes results to `baseline_results.json`.
+It runs all 4 tasks (easy/medium/hard/hard_multi) across seeded episodes and outputs both raw metrics and **grader scores in [0.0, 1.0]**. Results are written to `baseline_results.json`.
+
+```bash
+# Heuristic baseline (no API needed)
+uv run python inference.py --policy heuristic
+
+# LLM policy (requires env vars)
+API_BASE_URL=https://... MODEL_NAME=... HF_TOKEN=... uv run python inference.py --policy llm
+```
 
 ## How to Run (local)
 

@@ -9,8 +9,8 @@ from openai import OpenAI
 from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, ActionType, Observation, TaskConfig
 from budget_router.policies import heuristic_baseline_policy
-from budget_router.reward import episode_metrics
-from budget_router.tasks import EASY, HARD, MEDIUM
+from budget_router.reward import episode_metrics, grade_episode
+from budget_router.tasks import EASY, HARD, HARD_MULTI, MEDIUM
 
 app = typer.Typer(add_completion=False)
 
@@ -22,6 +22,7 @@ TASKS: Dict[str, TaskConfig] = {
     "easy": EASY,
     "medium": MEDIUM,
     "hard": HARD,
+    "hard_multi": HARD_MULTI,
 }
 VALID_ACTIONS = [action.value for action in ActionType]
 
@@ -97,6 +98,10 @@ def run_episode(env: BudgetRouterEnv, scenario: TaskConfig, seed: int, policy_na
     metrics = episode_metrics(env._internal.history)
     metrics["total_reward"] = round(total_reward, 4)
     metrics["episode_length"] = env._internal.current_step
+    # Add grader score (0.0-1.0) for each episode
+    grader = grade_episode(env._internal.history)
+    metrics["grader_score"] = grader["overall_score"]
+    metrics["grader_breakdown"] = grader
     return metrics
 
 
@@ -107,6 +112,7 @@ def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
         "mean_success_rate": round(sum(row["success_rate"] for row in rows) / len(rows), 4),
         "mean_cost": round(sum(row["total_cost_spent"] for row in rows) / len(rows), 4),
         "mean_latency_ms": round(sum(row["average_latency_ms"] for row in rows) / len(rows), 2),
+        "mean_grader_score": round(sum(row["grader_score"] for row in rows) / len(rows), 4),
     }
 
 
@@ -114,7 +120,7 @@ def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
 def main(
     policy: Literal["heuristic", "llm"] = typer.Option("heuristic"),
     seed_set: Literal["development", "heldout"] = typer.Option("development"),
-    scenario: Literal["all", "easy", "medium", "hard"] = typer.Option("all"),
+    scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("all"),
     output_path: Path = typer.Option(Path("baseline_results.json")),
 ) -> None:
     env = BudgetRouterEnv()
