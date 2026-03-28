@@ -17,6 +17,7 @@ import random as stdlib_random
 from typing import Optional
 
 from .models import Action, ActionType, InternalState, Observation
+from .reward import BUDGET_WEIGHT
 
 
 def random_policy(obs: Observation, rng: Optional[stdlib_random.Random] = None) -> Action:
@@ -31,7 +32,8 @@ def heuristic_baseline_policy(obs: Observation) -> Action:
     Stateless heuristic: prefer cheapest provider with status > threshold.
     Fallback to next cheapest. shed_load only if ALL below threshold.
 
-    Budget-aware: if budget is low, prefer cheaper providers more aggressively.
+    Budget-aware: when budget is critically low, only use the cheapest
+    viable provider or shed load to avoid the -10 budget exhaustion penalty.
     No privileged information. Uses only what the agent can observe.
     """
     threshold = 0.52
@@ -42,6 +44,16 @@ def heuristic_baseline_policy(obs: Observation) -> Action:
         ("route_to_b", obs.provider_b_status),
         ("route_to_c", obs.provider_c_status),
     ]
+
+    # Budget safety: when critically low, exclude expensive providers
+    # to prevent the -10.0 terminal budget exhaustion penalty.
+    # Only blocks C ($0.10/req) when budget can't absorb it.
+    if obs.budget_remaining < 0.10:
+        # Only consider A ($0.01) and B ($0.05) — skip C
+        for action_name, status in providers[:2]:
+            if status > threshold:
+                return Action(action=ActionType(action_name))
+        return Action(action=ActionType.SHED_LOAD)
 
     for action_name, status in providers:
         if status > threshold:
@@ -87,8 +99,8 @@ def debug_upper_bound_policy(obs: Observation, internal_state: InternalState) ->
             continue
 
         # Expected per-step reward matching reward.py:
-        # P(success) * 1.0 + P(fail) * -2.0 - cost/initial_budget
-        ev = health * 1.0 + (1.0 - health) * (-2.0) - (cost / initial_budget)
+        # P(success) * 1.0 + P(fail) * -2.0 - (cost/initial_budget) * BUDGET_WEIGHT
+        ev = health * 1.0 + (1.0 - health) * (-2.0) - (cost / initial_budget) * BUDGET_WEIGHT
 
         if ev > best_ev:
             best_ev = ev
@@ -98,7 +110,7 @@ def debug_upper_bound_policy(obs: Observation, internal_state: InternalState) ->
         # No affordable provider — pick the cheapest one we can still afford once
         for action_name, health, cost in providers_info:
             if cost <= budget_dollars:
-                ev = health * 1.0 + (1.0 - health) * (-2.0) - (cost / initial_budget)
+                ev = health * 1.0 + (1.0 - health) * (-2.0) - (cost / initial_budget) * BUDGET_WEIGHT
                 if ev > best_ev:
                     best_ev = ev
                     best_action = action_name

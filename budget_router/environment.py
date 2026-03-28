@@ -160,6 +160,8 @@ class BudgetRouterEnv(Environment):
             "step": self._internal.current_step,
             "action_type": action_type,
             "sla_ceiling_ms": self._config.sla_ceiling_ms,
+            "initial_budget": self._internal.initial_budget_dollars,
+            "degradation_start_step": self._config.degradation_start_step,
         }
 
         if action_type == "shed_load":
@@ -246,12 +248,20 @@ class BudgetRouterEnv(Environment):
             # Compute latency
             base_lat = provider.base_latency_ms
             noise = self._rng.gauss(0, self._config.latency_noise_std)
-            backlog_latency = BACKLOG_LATENCY_PER_ITEM_MS * self._internal.queue_backlog_count
+            # Queue backlog amplifies latency multiplicatively.
+            # At max backlog (norm=1.0), latency increases by 50%.
+            # This makes queue_backlog a causally relevant observation
+            # by indirectly coupling it to reward via SLA breaches.
+            queue_norm = (
+                self._internal.queue_backlog_count / self._internal.max_queue_backlog
+                if self._internal.max_queue_backlog > 0 else 0.0
+            )
+            backlog_amplifier = 1.0 + 0.5 * queue_norm
             # Failed requests have higher latency (timeout-like behavior)
             if not request_succeeded:
-                actual_latency = base_lat + abs(noise) + 200.0 + backlog_latency
+                actual_latency = (base_lat + abs(noise) + 200.0) * backlog_amplifier
             else:
-                actual_latency = max(10.0, base_lat + noise + backlog_latency)  # floor at 10ms
+                actual_latency = max(10.0, (base_lat + noise) * backlog_amplifier)
             self._internal.last_latency_ms = actual_latency
 
             # Queue backlog: failures increase pressure
@@ -366,29 +376,40 @@ class BudgetRouterEnv(Environment):
 
     def _degrade(self) -> None:
         """
-        Apply exactly ONE stochastic degradation mechanism per step.
+        Apply stochastic degradation to configured provider(s).
 
         The target provider's health decreases based on:
         - degradation_rate from the TaskConfig
         - A small random perturbation
         - Only triggers after degradation_start_step
+        Supports secondary degradation for multi-provider scenarios.
         """
         config = self._config
         step = self._internal.current_step
 
-        if step < config.degradation_start_step:
-            return
+        # Primary degradation
+        if step >= config.degradation_start_step:
+            target = config.degradation_target
+            provider = self._internal.providers.get(target)
+            if provider is not None:
+                noise = self._rng.gauss(0, 0.02)
+                health_reduction = config.degradation_rate + noise
+                provider.current_health = max(
+                    0.05,
+                    provider.current_health - health_reduction,
+                )
 
-        target = config.degradation_target
-        provider = self._internal.providers.get(target)
-        if provider is None:
-            return
-
-        # Deterministic degradation + small noise
-        noise = self._rng.gauss(0, 0.02)  # small perturbation
-        health_reduction = config.degradation_rate + noise
-
-        provider.current_health = max(
-            0.05,  # floor: never fully dead (5% minimum)
-            provider.current_health - health_reduction,
-        )
+        # Secondary degradation (for multi-provider scenarios)
+        if (
+            config.secondary_degradation_target
+            and step >= config.secondary_degradation_start_step
+        ):
+            target = config.secondary_degradation_target
+            provider = self._internal.providers.get(target)
+            if provider is not None:
+                noise = self._rng.gauss(0, 0.02)
+                health_reduction = config.secondary_degradation_rate + noise
+                provider.current_health = max(
+                    0.05,
+                    provider.current_health - health_reduction,
+                )

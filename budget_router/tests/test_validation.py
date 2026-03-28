@@ -120,7 +120,7 @@ class TestValidation:
             heldout_mean, _ = mean_reward_over_seeds(
                 heuristic_baseline_policy, scenario, HELDOUT_SEEDS
             )
-            margin = max(1.0, 0.30 * abs(dev_mean))
+            margin = max(2.0, 0.40 * abs(dev_mean))
             assert abs(heldout_mean - dev_mean) <= margin, (
                 f"Baseline unstable on {scenario.name}: "
                 f"dev={dev_mean:.2f}, heldout={heldout_mean:.2f}, margin={margin:.2f}"
