@@ -89,6 +89,10 @@ All observation values are normalized to `[0.0, 1.0]` in `Observation.__post_ini
 - `route_to_c`
 - `shed_load`
 
+## POMDP Framing
+
+The agent operates under **partial observability**: it sees windowed success rates (last 5 attempts per provider), not true health values. This is intentional — real incident responders also see symptoms (error rates), not root cause. The agent must infer degradation from the observation stream and adapt routing accordingly.
+
 ## Environment Dynamics (what actually happens per step)
 
 ```mermaid
@@ -99,7 +103,7 @@ sequenceDiagram
   participant Prov as Provider(A/B/C)
 
   Agent->>Env: Action(route_to_*) or shed_load
-  Env->>Deg: Apply degradation (task-defined)
+  Env->>Deg: Apply degradation (task-defined, supports multi-target)
   alt shed_load
     Env->>Env: backlog = max(0, backlog-1)
     Env->>Env: reward = -0.5
@@ -108,21 +112,22 @@ sequenceDiagram
     Env->>Prov: success ~ Bernoulli(current_health)
     Env->>Env: update windowed success tracking
     Env->>Env: backlog += 2 on failure; backlog -= 1 on success
-    Env->>Env: latency = base_latency + noise + (8ms * backlog)
+    Env->>Env: latency amplified by backlog (multiplicative)
     Env->>Env: reward = step_reward(...)
   end
   Env-->>Agent: Observation + reward + done
 ```
 
-### Backlog causality (deterministic)
+### Backlog → Latency causality (multiplicative)
 
-Backlog increases latency via a simple linear coupling:
+Backlog amplifies latency via multiplicative coupling, not just additive:
 
-- `BACKLOG_LATENCY_PER_ITEM_MS = 8.0`
-- `backlog_latency = 8.0 * queue_backlog_count`
-- Added to the computed request latency in `BudgetRouterEnv.step()`.
+- `queue_norm = queue_backlog_count / max_queue_backlog`
+- `backlog_amplifier = 1.0 + 0.5 * queue_norm`
+- Latency is multiplied by `backlog_amplifier` (up to 1.5x when queue is full)
+- On **failure**, an additional 200ms penalty is applied (representing retry overhead)
 
-This makes backlog a leading indicator for SLA risk without adding new actions or external infrastructure.
+This creates a compounding feedback loop: failures → backlog → higher latency → more failures. The agent must break this cycle by routing to healthy providers.
 
 ## Reward (per-step, code-grounded)
 
@@ -131,33 +136,50 @@ Implemented in `budget_router/reward.py::step_reward()`:
 - **Route actions**
   - `+1.0` on success
   - `-2.0` on failure
-  - `-(provider_cost / initial_budget)` cost penalty
+  - `-(provider_cost / initial_budget) * BUDGET_WEIGHT` cost penalty (BUDGET_WEIGHT=5.0)
   - if `latency_ms > sla_ceiling_ms`: `-(excess_latency / sla_ceiling_ms)`
 - **shed_load**: fixed `-0.5` (replaces routing terms)
 - **Budget exhaustion**: terminal `-10.0` and `done=True`
 
+The 5x cost scaling ensures the cost signal (~0.05–0.50 per step) is comparable to the success/failure signal (±1.0–2.0), creating meaningful budget tradeoffs.
+
 ## Episode Metrics & Grading
 
-Two deterministic evaluation utilities exist in `budget_router/reward.py`:
+Two deterministic evaluation utilities in `budget_router/reward.py`:
 
-- `episode_metrics(history)`
-  - total reward, success rate, total cost, average latency, SLA met, queue overflow events
-- `grade_episode(history)`
-  - returns `overall_score` in `[0,1]` plus a breakdown
+- `episode_metrics(history)` — total reward, success rate, total cost, average latency, SLA met, queue overflow events
+- `grade_episode(history)` — returns `overall_score` in `[0,1]` with weighted breakdown:
+  - 0.30 × success_score (routing success rate)
+  - 0.20 × latency_score (latency relative to SLA ceiling)
+  - 0.15 × budget_score (remaining budget fraction)
+  - 0.15 × sla_score (per-request SLA compliance rate)
+  - 0.20 × adaptation_score (post-degradation success rate — directly measures whether the agent detected and adapted to degradation)
 
-The current validation harness uses `episode_metrics`.
+The adaptation score is the key differentiator: it measures performance *after* degradation begins, rewarding agents that detect and respond to non-stationarity.
 
 ## Task Presets (exact values in code)
 
 Defined in `budget_router/tasks.py`:
 
-| Task | Initial budget | Degradation |
-|------|----------------|-------------|
-| `easy` | `1.0` | No degradation (`degradation_start_step=999`, `rate=0.0`) |
-| `medium` | `0.95` | Provider A degrades after step 5 (`rate=0.15`, target `A`) |
-| `hard` | `0.9` | Provider A degrades from step 0 (`rate=0.08`, target `A`) |
+| Task | Budget | Degradation | Key challenge |
+|------|--------|-------------|---------------|
+| `easy` | `1.00` | None | Routing quality matters; always-A fails on heldout seeds |
+| `medium` | `0.95` | A degrades after step 5 (rate 0.15) | Must detect A's degradation and switch routing |
+| `hard` | `0.85` | A degrades from step 0 (rate 0.15), high noise (σ=50ms) | Tight budget + immediate degradation + noise |
+| `hard_multi` | `1.00` | A degrades from step 0 (rate 0.12), B degrades from step 10 (rate 0.10) | Multi-provider failure cascade |
 
 All tasks use `max_steps=20`, `max_queue_backlog=10`, `sla_ceiling_ms=500.0`.
+
+### Validation Benchmarks (development seeds, mean reward)
+
+| Task | Oracle | Baseline | Random | Baseline advantage |
+|------|--------|----------|--------|--------------------|
+| `easy` | 10.10 | 7.88 | 3.15 | +150% over random |
+| `medium` | 9.49 | 3.72 | -6.75 | Baseline positive, random negative |
+| `hard` | 6.57 | 0.01 | -13.15 | 656× gap |
+| `hard_multi` | 2.83 | -3.43 | -11.30 | 182% gap (oracle-only solvable) |
+
+HARD_MULTI is designed so the heuristic baseline fails by design — only an adaptive agent can achieve positive reward.
 
 ## Baselines (what exists + how we prevent gaming)
 
@@ -211,21 +233,31 @@ uv run python -m budget_router.validation
 openenv validate --verbose .
 ```
 
+## Episode Visualization
+
+4-panel matplotlib plots showing provider health, budget remaining, action distribution, and cumulative reward per step.
+
+```bash
+# Generate visualizations for all scenarios
+uv run python visualize.py --scenario medium --seed 42
+uv run python visualize.py --scenario hard_multi --seed 42 --policy oracle
+```
+
+Output goes to `docs/` as PNGs. These demonstrate the environment dynamics and policy behavior differences for judge presentation.
+
 ## Known Limitations / Potential Loopholes (grounded, not hypothetical)
 
-- **Single degradation target**: tasks currently degrade only provider A (see `TaskConfig.degradation_target` in `budget_router/tasks.py`). This is realistic for “one vendor incident” but less realistic for correlated outages.
-- **Backlog model is intentionally simple**: latency coupling is linear and small (8ms per backlog item) in `budget_router/environment.py`. This captures tail-latency pressure but not full queueing theory.
-- **Cost signal is smaller than failure signal**: cost penalty is `-(cost / initial_budget)` (see `step_reward`). This is deliberate to keep correctness dominant, but it can reduce gradient signal for fine-grained cost optimization.
+- **Multi-target degradation is task-specific**: only `hard_multi` has secondary degradation (B from step 10). Other tasks degrade only provider A. This is realistic for single-vendor incidents but less realistic for correlated outages.
 - **Shed-load can dodge SLA penalties**: `shed_load` produces no request latency (latency=0.0) and reduces backlog by 1, but it still incurs `-0.5`. The benchmark prevents “always shed” from winning via explicit degenerate-policy checks.
 
 ## Project Structure (as in this repo)
 
 ```
 budget_router/
-  models.py        # dataclasses: Action, Observation, EnvState, TaskConfig, InternalState
+  models.py        # dataclasses: Action, Observation, EnvState, TaskConfig (incl. secondary degradation)
   environment.py   # BudgetRouterEnv (reset/step/state), degradation + backlog dynamics
-  reward.py        # step_reward(), episode_metrics(), grade_episode()
-  tasks.py         # EASY/MEDIUM/HARD presets
+  reward.py        # step_reward(), episode_metrics(), grade_episode() (incl. adaptation_score)
+  tasks.py         # EASY/MEDIUM/HARD/HARD_MULTI presets
   policies.py      # heuristic baseline + oracle + degenerate baselines
   validation.py    # run_validation(), assert_all_checks(), run_manual_trace()
   client.py        # BudgetRouterClient (HTTPEnvClient)
@@ -233,7 +265,9 @@ budget_router/
 server/
   app.py           # FastAPI wrapper (create_app)
   Dockerfile       # OpenEnv base image + uv sync + uvicorn
+docs/              # Episode visualization PNGs
 openenv.yaml       # OpenEnv manifest
+visualize.py       # Episode visualization script (4-panel matplotlib)
 inference.py       # baseline reproduction script
 pyproject.toml     # dependencies + server entrypoint
 uv.lock            # resolved deps
