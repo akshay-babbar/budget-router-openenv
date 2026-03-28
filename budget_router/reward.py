@@ -119,3 +119,54 @@ def episode_metrics(history: List[Dict[str, Any]]) -> Dict[str, Any]:
         "sla_met": sla_met,
         "queue_overflow_events": queue_overflows,
     }
+
+
+def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if not history:
+        return {
+            "overall_score": 0.0,
+            "success_score": 0.0,
+            "latency_score": 0.0,
+            "budget_score": 0.0,
+            "sla_score": 0.0,
+        }
+
+    metrics = episode_metrics(history)
+
+    success_score = float(metrics.get("success_rate", 0.0))
+
+    sla_ceiling_ms = float(history[0].get("sla_ceiling_ms", 500.0) or 500.0)
+    avg_latency_ms = float(metrics.get("average_latency_ms", 0.0))
+
+    if sla_ceiling_ms <= 0:
+        sla_ceiling_ms = 1.0
+
+    latency_score = 1.0 - min(1.0, avg_latency_ms / sla_ceiling_ms)
+
+    routing_steps = [h for h in history if h.get("action_type") != "shed_load"]
+    if routing_steps:
+        sla_ok = sum(1 for h in routing_steps if float(h.get("latency_ms", 0.0)) <= sla_ceiling_ms)
+        sla_score = sla_ok / len(routing_steps)
+    else:
+        sla_score = 1.0
+
+    total_cost = float(metrics.get("total_cost_spent", 0.0))
+    max_cost_per_request = 0.10
+    max_cost = max(1.0e-9, max_cost_per_request * max(1, len(routing_steps)))
+    budget_score = 1.0 - min(1.0, total_cost / max_cost)
+
+    overall = (
+        0.4 * success_score
+        + 0.2 * latency_score
+        + 0.2 * budget_score
+        + 0.2 * sla_score
+    )
+
+    overall = max(0.0, min(1.0, overall))
+    return {
+        "overall_score": round(overall, 4),
+        "success_score": round(max(0.0, min(1.0, success_score)), 4),
+        "latency_score": round(max(0.0, min(1.0, latency_score)), 4),
+        "budget_score": round(max(0.0, min(1.0, budget_score)), 4),
+        "sla_score": round(max(0.0, min(1.0, sla_score)), 4),
+    }

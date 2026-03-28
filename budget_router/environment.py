@@ -29,6 +29,8 @@ from .models import (
 from .reward import step_reward
 from .tasks import EASY
 
+BACKLOG_LATENCY_PER_ITEM_MS = 8.0
+
 
 class BudgetRouterEnv(Environment):
     """
@@ -244,11 +246,12 @@ class BudgetRouterEnv(Environment):
             # Compute latency
             base_lat = provider.base_latency_ms
             noise = self._rng.gauss(0, self._config.latency_noise_std)
+            backlog_latency = BACKLOG_LATENCY_PER_ITEM_MS * self._internal.queue_backlog_count
             # Failed requests have higher latency (timeout-like behavior)
             if not request_succeeded:
-                actual_latency = base_lat + abs(noise) + 200.0  # failure adds 200ms
+                actual_latency = base_lat + abs(noise) + 200.0 + backlog_latency
             else:
-                actual_latency = max(10.0, base_lat + noise)  # floor at 10ms
+                actual_latency = max(10.0, base_lat + noise + backlog_latency)  # floor at 10ms
             self._internal.last_latency_ms = actual_latency
 
             # Queue backlog: failures increase pressure
