@@ -14,7 +14,8 @@ import random
 import uuid
 from typing import Any, Dict, Optional, Tuple
 
-from openenv.core.env_server import Environment
+from openenv_core.env_server import Environment
+from openenv_core.env_server.types import Action as OpenEnvAction
 
 from .models import (
     Action,
@@ -29,7 +30,7 @@ from .reward import step_reward
 from .tasks import EASY
 
 
-class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
+class BudgetRouterEnv(Environment):
     """
     Incident Commander for Budgeted Tool/API Reliability.
 
@@ -65,6 +66,7 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
         config = scenario or kwargs.get("scenario", EASY)
         if isinstance(config, str):
             from .tasks import TASK_PRESETS
+
             config = TASK_PRESETS.get(config, EASY)
         self._config = config
 
@@ -122,7 +124,7 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
 
     def step(
         self,
-        action: Action,
+        action: OpenEnvAction,
         timeout_s: Optional[float] = None,
         **kwargs: Any,
     ) -> Observation:
@@ -138,6 +140,12 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
             obs.done = True
             obs.reward = 0.0
             return obs
+
+        if not isinstance(action, Action):
+            action = Action(
+                action=getattr(action, "action"),
+                metadata=getattr(action, "metadata", {}),
+            )
 
         self._internal.current_step += 1
         action_type = action.action.value
@@ -169,14 +177,16 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
             # Latency set to 0 for shed (no request processed)
             self._internal.last_latency_ms = 0.0
 
-            step_info.update({
-                "request_succeeded": False,
-                "cost": 0.0,
-                "latency_ms": 0.0,
-                "reward": reward,
-                "provider": None,
-                "queue_overflow": False,
-            })
+            step_info.update(
+                {
+                    "request_succeeded": False,
+                    "cost": 0.0,
+                    "latency_ms": 0.0,
+                    "reward": reward,
+                    "provider": None,
+                    "queue_overflow": False,
+                }
+            )
 
         else:
             # Route to a provider
@@ -197,15 +207,17 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
                 self._internal.episode_done = True
                 self._internal.last_latency_ms = 0.0
 
-                step_info.update({
-                    "request_succeeded": False,
-                    "cost": cost,
-                    "latency_ms": 0.0,
-                    "reward": reward,
-                    "provider": provider_name,
-                    "queue_overflow": False,
-                    "budget_exhausted": True,
-                })
+                step_info.update(
+                    {
+                        "request_succeeded": False,
+                        "cost": cost,
+                        "latency_ms": 0.0,
+                        "reward": reward,
+                        "provider": provider_name,
+                        "queue_overflow": False,
+                        "budget_exhausted": True,
+                    }
+                )
 
                 self._internal.history.append(step_info)
                 self._cumulative_reward += reward
@@ -246,7 +258,10 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
                     self._internal.max_queue_backlog,
                     self._internal.queue_backlog_count + 2,
                 )
-                if self._internal.queue_backlog_count >= self._internal.max_queue_backlog:
+                if (
+                    self._internal.queue_backlog_count
+                    >= self._internal.max_queue_backlog
+                ):
                     queue_overflow = True
             else:
                 # Successful request drains queue slightly
@@ -264,14 +279,16 @@ class BudgetRouterEnv(Environment[Action, Observation, EnvState]):
                 sla_ceiling_ms=self._config.sla_ceiling_ms,
             )
 
-            step_info.update({
-                "request_succeeded": request_succeeded,
-                "cost": cost,
-                "latency_ms": round(actual_latency, 2),
-                "reward": reward,
-                "provider": provider_name,
-                "queue_overflow": queue_overflow,
-            })
+            step_info.update(
+                {
+                    "request_succeeded": request_succeeded,
+                    "cost": cost,
+                    "latency_ms": round(actual_latency, 2),
+                    "reward": reward,
+                    "provider": provider_name,
+                    "queue_overflow": queue_overflow,
+                }
+            )
 
         # ── Record history ──
         self._internal.history.append(step_info)

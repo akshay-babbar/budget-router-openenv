@@ -1,15 +1,14 @@
-from openenv.core.env_server import create_app
+from openenv_core.env_server import create_app
 import uvicorn
 
 from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, Observation
 
 app = create_app(
-    BudgetRouterEnv,
+    BudgetRouterEnv(),
     Action,
     Observation,
     env_name="budget_router",
-    max_concurrent_envs=1,
 )
 
 

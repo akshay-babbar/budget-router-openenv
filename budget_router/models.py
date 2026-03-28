@@ -1,22 +1,14 @@
-"""
-Core data models for the Budget Router environment.
-
-Extends openenv-core base types (Action, Observation, State) with
-domain-specific fields. Uses Pydantic v2 throughout.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from openenv.core.env_server.types import (
+from openenv_core.env_server.types import (
     Action as BaseAction,
     Observation as BaseObservation,
     State as BaseState,
 )
-from pydantic import ConfigDict, Field, field_validator
 
 
 # =============================================================================
@@ -26,21 +18,26 @@ from pydantic import ConfigDict, Field, field_validator
 
 class ActionType(str, Enum):
     """The four possible routing actions."""
+
     ROUTE_TO_A = "route_to_a"
     ROUTE_TO_B = "route_to_b"
     ROUTE_TO_C = "route_to_c"
     SHED_LOAD = "shed_load"
 
 
+@dataclass(kw_only=True)
 class Action(BaseAction):
     """
     Agent action: route a request to a provider or shed load.
 
     Extends OpenEnv Action (which provides `metadata` field).
     """
-    action: ActionType = Field(
-        description="Which provider to route to, or shed_load to drop the request."
-    )
+
+    action: ActionType
+
+    def __post_init__(self) -> None:
+        if isinstance(self.action, str):
+            self.action = ActionType(self.action)
 
 
 # =============================================================================
@@ -48,6 +45,7 @@ class Action(BaseAction):
 # =============================================================================
 
 
+@dataclass(kw_only=True)
 class Observation(BaseObservation):
     """
     Agent-visible observation. ALL numeric fields are normalized to [0.0, 1.0].
@@ -56,27 +54,29 @@ class Observation(BaseObservation):
     """
 
     # Provider health (recent success rates)
-    provider_a_status: float = Field(ge=0.0, le=1.0, description="Provider A recent success rate")
-    provider_b_status: float = Field(ge=0.0, le=1.0, description="Provider B recent success rate")
-    provider_c_status: float = Field(ge=0.0, le=1.0, description="Provider C recent success rate")
+    provider_a_status: float
+    provider_b_status: float
+    provider_c_status: float
 
     # Resource state
-    budget_remaining: float = Field(ge=0.0, le=1.0, description="Fraction of initial budget remaining")
-    queue_backlog: float = Field(ge=0.0, le=1.0, description="Normalized pending/failed request pressure")
-    system_latency: float = Field(ge=0.0, le=1.0, description="Last step latency normalized to SLA ceiling")
+    budget_remaining: float
+    queue_backlog: float
+    system_latency: float
 
     # Episode progress
-    step_count: float = Field(ge=0.0, le=1.0, description="Normalized episode progress (step/max_steps)")
+    step_count: float
 
-    @field_validator(
-        "provider_a_status", "provider_b_status", "provider_c_status",
-        "budget_remaining", "queue_backlog", "system_latency", "step_count",
-        mode="after",
-    )
-    @classmethod
-    def clamp_to_unit(cls, v: float) -> float:
-        """Safety clamp: ensure all observation values stay in [0, 1]."""
-        return max(0.0, min(1.0, v))
+    def __post_init__(self) -> None:
+        for field_name in (
+            "provider_a_status",
+            "provider_b_status",
+            "provider_c_status",
+            "budget_remaining",
+            "queue_backlog",
+            "system_latency",
+            "step_count",
+        ):
+            setattr(self, field_name, max(0.0, min(1.0, getattr(self, field_name))))
 
 
 # =============================================================================
@@ -87,11 +87,12 @@ class Observation(BaseObservation):
 @dataclass
 class ProviderState:
     """Internal state of a single provider in raw units."""
+
     name: str
-    base_reliability: float       # initial reliability [0, 1]
-    current_health: float         # current health [0, 1]
-    cost_per_request: float       # dollars
-    base_latency_ms: float        # base latency in ms
+    base_reliability: float  # initial reliability [0, 1]
+    current_health: float  # current health [0, 1]
+    cost_per_request: float  # dollars
+    base_latency_ms: float  # base latency in ms
     total_requests: int = 0
     successful_requests: int = 0
 
@@ -109,6 +110,7 @@ class InternalState:
     Full internal state in raw units. NOT exposed to the agent.
     Used for manual trace, debugging, and the oracle policy.
     """
+
     providers: Dict[str, ProviderState] = field(default_factory=dict)
     budget_dollars: float = 0.0
     initial_budget_dollars: float = 0.0
@@ -144,6 +146,7 @@ class TaskConfig:
     Configuration for a task scenario. Passed to reset(scenario=config).
     NOT a subclass — just a data container.
     """
+
     name: str
     description: str
 
@@ -169,16 +172,16 @@ class TaskConfig:
     sla_ceiling_ms: float = 500.0
 
     # Degradation config
-    degradation_start_step: int = 0       # step at which degradation begins
-    degradation_rate: float = 0.0         # health reduction per step for provider A
-    degradation_target: str = "A"         # which provider degrades
+    degradation_start_step: int = 0  # step at which degradation begins
+    degradation_rate: float = 0.0  # health reduction per step for provider A
+    degradation_target: str = "A"  # which provider degrades
 
     # Episode
     max_steps: int = 20
     max_queue_backlog: int = 10
 
     # Stochastic noise
-    latency_noise_std: float = 30.0       # ms std dev added to base latency
+    latency_noise_std: float = 30.0  # ms std dev added to base latency
 
 
 # =============================================================================
@@ -186,10 +189,12 @@ class TaskConfig:
 # =============================================================================
 
 
+@dataclass
 class EnvState(BaseState):
     """
     OpenEnv-compatible state object returned by the `state` property.
     Extends BaseState (which provides `episode_id`, `step_count` fields).
     """
-    scenario_name: str = Field(default="", description="Current task scenario name")
-    is_done: bool = Field(default=False, description="Whether episode is complete")
+
+    scenario_name: str = ""
+    is_done: bool = False

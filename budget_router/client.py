@@ -1,24 +1,23 @@
+from dataclasses import asdict
 from typing import Any, Dict
 
-from openenv.core import EnvClient
-from openenv.core.client_types import StepResult
+from openenv_core import HTTPEnvClient
+from openenv_core.client_types import StepResult
 
 from .models import Action, EnvState, Observation
 
 
-class BudgetRouterClient(EnvClient[Action, Observation, EnvState]):
+class BudgetRouterClient(HTTPEnvClient[Action, Observation]):
     def _step_payload(self, action: Action) -> Dict[str, Any]:
-        return action.model_dump(mode="json")
+        return asdict(action)
 
     def _parse_result(self, payload: Dict[str, Any]) -> StepResult[Observation]:
         observation_payload = payload.get("observation", payload)
-        observation = Observation.model_validate(
-            {
-                **observation_payload,
-                "done": payload.get("done", observation_payload.get("done", False)),
-                "reward": payload.get("reward", observation_payload.get("reward")),
-                "metadata": observation_payload.get("metadata", payload.get("metadata", {})),
-            }
+        observation = Observation(
+            **observation_payload,
+            done=payload.get("done", observation_payload.get("done", False)),
+            reward=payload.get("reward", observation_payload.get("reward")),
+            metadata=observation_payload.get("metadata", payload.get("metadata", {})),
         )
         return StepResult(
             observation=observation,
@@ -27,4 +26,4 @@ class BudgetRouterClient(EnvClient[Action, Observation, EnvState]):
         )
 
     def _parse_state(self, payload: Dict[str, Any]) -> EnvState:
-        return EnvState.model_validate(payload)
+        return EnvState(**payload)
