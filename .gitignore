@@ -6,6 +6,8 @@ __pycache__/
 .Python
 *.so
 .env
+.hf_private/
+.windsurf/
 .DS_Store
 *.egg-info/
 dist/

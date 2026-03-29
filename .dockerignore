@@ -1,0 +1,16 @@
+.venv/
+.git/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+docs/*.png
+**/*.png
+*.tar.gz
+*.egg-info/
+.env
+.claude/
+.windsurf/
+.hf_private/
+.DS_Store
+artifacts/
