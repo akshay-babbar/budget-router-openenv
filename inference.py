@@ -12,6 +12,37 @@ from budget_router.policies import heuristic_baseline_policy
 from budget_router.reward import episode_metrics, grade_episode
 from budget_router.tasks import EASY, HARD, HARD_MULTI, MEDIUM
 
+import re
+
+_VALID_ACTIONS = ["route_to_a", "route_to_b", "route_to_c", "shed_load"]
+
+
+def _parse_llm_action(response_text: str) -> str:
+    """Extract a valid action from LLM output. Falls back to shed_load — never raises."""
+    text = response_text.strip().lower()
+    for action in _VALID_ACTIONS:
+        if action in text:
+            return action
+    return "shed_load"  # safe fallback: always valid, never crashes
+
+
+SYSTEM_PROMPT = """You are an incident-response routing agent controlling a 
+    production service. At each step you observe provider health metrics and must 
+    choose exactly one action.
+
+    Valid actions — respond with ONLY one of these four strings, nothing else:
+      route_to_a
+      route_to_b
+      route_to_c
+      shed_load
+
+    Decision rules:
+    - Prefer providers with windowed success rate above 0.52 and lower cost.
+    - If budget_remaining is below 0.20, prefer cheaper providers or shed_load.
+    - shed_load reduces backlog but costs -0.5 reward — use it when all providers 
+      are degraded, not as a default.
+    - Never respond with anything other than one of the four action strings above."""
+
 app = typer.Typer(add_completion=False)
 
 SEED_SETS: Dict[str, List[int]] = {
@@ -27,97 +58,43 @@ TASKS: Dict[str, TaskConfig] = {
 VALID_ACTIONS = [action.value for action in ActionType]
 
 
-import re
-
-_VALID_ACTIONS = ["route_to_a", "route_to_b", "route_to_c", "shed_load"]
-
-
-def _parse_llm_action(response_text: str) -> str:
-    """Parse LLM response into a valid action string. Returns shed_load as safe fallback."""
-    text = response_text.strip().lower()
-    for action in _VALID_ACTIONS:
-        if action in text:
-            return action
-    return "shed_load"  # safe fallback: never crashes, never invalid
-
-
 class LLMRouter:
     def __init__(self, api_base_url: str, model_name: str, api_key: str) -> None:
         self._client = OpenAI(base_url=api_base_url, api_key=api_key)
         self._model_name = model_name
 
-    _SYSTEM_PROMPT = """You are an incident commander managing a real-time API routing system.
-You must route each incoming request to one of three providers or shed load.
-
-PROVIDERS (fixed costs and baseline reliability):
-- Provider A: $0.01/request, baseline reliability ~85%, fastest latency (~100ms). MAY DEGRADE over time.
-- Provider B: $0.05/request, baseline reliability ~92%, medium latency (~150ms). MAY DEGRADE in hard scenarios.
-- Provider C: $0.10/request, baseline reliability ~99%, slower latency (~200ms). Stable but expensive.
-
-OBSERVATION (all values normalized 0.0-1.0):
-- provider_a_status: recent windowed success rate for Provider A (low = degraded/failing)
-- provider_b_status: recent windowed success rate for Provider B
-- provider_c_status: recent windowed success rate for Provider C
-- budget_remaining: fraction of episode budget left (0.0 = exhausted, causes episode end with -10 penalty)
-- queue_backlog: request queue pressure (high = latency amplification cascade risk)
-- system_latency: last latency relative to 500ms SLA ceiling (above 1.0 = SLA breach)
-- step_count: episode progress (0.0 = start, 1.0 = end)
-
-GOAL: Maximize cumulative reward over 20 steps.
-- Success: +1.0 per routed request that succeeds
-- Failure: -2.0 per routed request that fails
-- Cost penalty: proportional to provider cost (A cheapest, C most expensive)
-- SLA breach penalty: if latency exceeds 500ms ceiling
-- Budget exhaustion: -10.0 terminal penalty if budget hits zero
-
-STRATEGY HINTS:
-- If a provider's status drops below ~0.5, switch away from it — it is degrading.
-- Provider A is cheapest but may degrade early; detect this from its status reading.
-- shed_load (-0.5 flat) is better than routing to a failing provider (-2.0 + cost).
-- Watch budget_remaining — if it's critically low (<0.15), avoid expensive providers.
-- The optimal strategy adapts routing as providers degrade; never locks onto one provider.
-
-VALID ACTIONS (respond with exactly one of these four strings and nothing else):
-  route_to_a
-  route_to_b
-  route_to_c
-  shed_load"""
-
     def choose_action(self, observation: Observation) -> Action:
-        prompt = self._build_prompt(observation)
+        obs = observation
+        obs_text = "\n".join([
+            f"provider_a_status: {obs.provider_a_status:.3f}",
+            f"provider_b_status: {obs.provider_b_status:.3f}",
+            f"provider_c_status: {obs.provider_c_status:.3f}",
+            f"budget_remaining:  {obs.budget_remaining:.3f}",
+            f"queue_backlog:     {obs.queue_backlog:.3f}",
+            f"system_latency:    {obs.system_latency:.3f}",
+            f"step_count:        {obs.step_count:.3f}",
+        ])
+        user_prompt = f"Current observation:\n{obs_text}\n\nYour action:"
+
+        client = self._client
+        model_name = self._model_name
         try:
-            completion = self._client.chat.completions.create(
-                model=self._model_name,
-                temperature=0,
+            response = client.chat.completions.create(
+                model=model_name,
                 messages=[
-                    {"role": "system", "content": self._SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": user_prompt},
                 ],
+                max_tokens=20,
+                temperature=0.0,
             )
-            content = (completion.choices[0].message.content or "").strip().lower()
-            action_str = _parse_llm_action(content)
+            raw = response.choices[0].message.content or ""
+            action_str = _parse_llm_action(raw)
         except Exception as e:
             import sys
-            print(f"WARNING: LLM API call failed ({type(e).__name__}: {e}), falling back to shed_load", file=sys.stderr)
+            print(f"[llm_policy] API error — defaulting to shed_load: {e}", file=sys.stderr)
             action_str = "shed_load"
         return Action(action=ActionType(action_str))
-
-    def _build_prompt(self, observation: Observation) -> str:
-        step = round(observation.step_count * 20)
-        lines = [
-            "Current environment state:",
-            f"  step: {step} / 20",
-            f"  provider_a_status: {observation.provider_a_status:.3f} ({'healthy' if observation.provider_a_status > 0.6 else 'DEGRADED'})",
-            f"  provider_b_status: {observation.provider_b_status:.3f} ({'healthy' if observation.provider_b_status > 0.6 else 'DEGRADED'})",
-            f"  provider_c_status: {observation.provider_c_status:.3f} ({'healthy' if observation.provider_c_status > 0.6 else 'DEGRADED'})",
-            f"  budget_remaining: {observation.budget_remaining:.3f} ({'CRITICAL' if observation.budget_remaining < 0.15 else 'ok'})",
-            f"  queue_backlog: {observation.queue_backlog:.3f}",
-            f"  system_latency: {observation.system_latency:.3f} ({'SLA AT RISK' if observation.system_latency > 0.7 else 'ok'})",
-            "",
-            "Choose the best action. Reply with exactly one action name:",
-            "  route_to_a | route_to_b | route_to_c | shed_load",
-        ]
-        return "\n".join(lines)
 
 
 def select_policy(policy_name: Literal["heuristic", "llm"]) -> object:
