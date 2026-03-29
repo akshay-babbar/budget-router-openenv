@@ -4,3 +4,17 @@ type: space
 runtime: fastapi
 app: server.app:app
 port: 8000
+display_name: "Budget Router — Budgeted API Reliability RL Environment"
+description: >
+  A POMDP environment where an agent routes requests across three providers
+  under budget, SLA, and reliability constraints. Providers degrade non-stationarily;
+  the agent must detect degradation from windowed observations and adapt routing.
+  Four difficulty tiers: easy (stable), medium (A degrades after step 5),
+  hard (immediate degradation, tight budget), hard_multi (cascade failure A+B).
+  Designed for post-training agentic reliability agents.
+tags:
+  - reliability
+  - api-routing
+  - pomdp
+  - non-stationary
+  - budgeted-rl

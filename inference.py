@@ -32,19 +32,46 @@ class LLMRouter:
         self._client = OpenAI(base_url=api_base_url, api_key=api_key)
         self._model_name = model_name
 
+    _SYSTEM_PROMPT = """You are an incident commander managing a real-time API routing system.
+You must route each incoming request to one of three providers or shed load.
+
+PROVIDERS (fixed costs and baseline reliability):
+- Provider A: $0.01/request, baseline reliability ~85%, fastest latency (~100ms). MAY DEGRADE over time.
+- Provider B: $0.05/request, baseline reliability ~92%, medium latency (~150ms). MAY DEGRADE in hard scenarios.
+- Provider C: $0.10/request, baseline reliability ~99%, slower latency (~200ms). Stable but expensive.
+
+OBSERVATION (all values normalized 0.0-1.0):
+- provider_a_status: recent windowed success rate for Provider A (low = degraded/failing)
+- provider_b_status: recent windowed success rate for Provider B
+- provider_c_status: recent windowed success rate for Provider C
+- budget_remaining: fraction of episode budget left (0.0 = exhausted, causes episode end with -10 penalty)
+- queue_backlog: request queue pressure (high = latency amplification cascade risk)
+- system_latency: last latency relative to 500ms SLA ceiling (above 1.0 = SLA breach)
+- step_count: episode progress (0.0 = start, 1.0 = end)
+
+GOAL: Maximize cumulative reward over 20 steps.
+- Success: +1.0 per routed request that succeeds
+- Failure: -2.0 per routed request that fails
+- Cost penalty: proportional to provider cost (A cheapest, C most expensive)
+- SLA breach penalty: if latency exceeds 500ms ceiling
+- Budget exhaustion: -10.0 terminal penalty if budget hits zero
+
+STRATEGY HINTS:
+- If a provider's status drops below ~0.5, switch away from it — it is degrading.
+- Provider A is cheapest but may degrade early; detect this from its status reading.
+- shed_load (-0.5 flat) is better than routing to a failing provider (-2.0 + cost).
+- Watch budget_remaining — if it's critically low (<0.15), avoid expensive providers.
+- The optimal strategy adapts routing as providers degrade; never locks onto one provider.
+
+Respond with EXACTLY one of: route_to_a, route_to_b, route_to_c, shed_load"""
+
     def choose_action(self, observation: Observation) -> Action:
         prompt = self._build_prompt(observation)
         completion = self._client.chat.completions.create(
             model=self._model_name,
             temperature=0,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You control a budgeted routing environment. Return exactly one action from: "
-                        "route_to_a, route_to_b, route_to_c, shed_load."
-                    ),
-                },
+                {"role": "system", "content": self._SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
         )
@@ -55,18 +82,31 @@ class LLMRouter:
         return heuristic_baseline_policy(observation)
 
     def _build_prompt(self, observation: Observation) -> str:
-        return json.dumps(
-            {
-                "provider_a_status": observation.provider_a_status,
-                "provider_b_status": observation.provider_b_status,
-                "provider_c_status": observation.provider_c_status,
-                "budget_remaining": observation.budget_remaining,
-                "queue_backlog": observation.queue_backlog,
-                "system_latency": observation.system_latency,
-                "step_count": observation.step_count,
-                "valid_actions": VALID_ACTIONS,
+        # Include both raw normalized values AND interpreted context
+        context = {
+            "step": round(observation.step_count * 20),
+            "budget_remaining_fraction": round(observation.budget_remaining, 3),
+            "budget_critically_low": observation.budget_remaining < 0.15,
+            "provider_a_status": round(observation.provider_a_status, 3),
+            "provider_a_healthy": observation.provider_a_status > 0.6,
+            "provider_b_status": round(observation.provider_b_status, 3),
+            "provider_b_healthy": observation.provider_b_status > 0.6,
+            "provider_c_status": round(observation.provider_c_status, 3),
+            "queue_backlog_fraction": round(observation.queue_backlog, 3),
+            "latency_fraction_of_sla": round(observation.system_latency, 3),
+            "sla_at_risk": observation.system_latency > 0.7,
+            "valid_actions": VALID_ACTIONS,
+            "action_costs": {
+                "route_to_a": "$0.01",
+                "route_to_b": "$0.05",
+                "route_to_c": "$0.10",
+                "shed_load": "$0.00 (flat -0.5 penalty)",
             },
-            sort_keys=True,
+        }
+        return (
+            "Current environment state:\n"
+            + json.dumps(context, indent=2)
+            + "\n\nChoose the best action. Reply with exactly one action name."
         )
 
 

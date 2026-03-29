@@ -78,8 +78,8 @@ HARD = TaskConfig(
 
 HARD_MULTI = TaskConfig(
     name="hard_multi",
-    description="A degrades from step 0, B degrades from step 10. Must manage multi-provider failure.",
-    initial_budget=1.00,
+    description="A degrades from step 0, B degrades from step 10. Multi-provider cascade. Slightly wider budget to reward efficient routing.",
+    initial_budget=1.10,
     cost_a=0.01,
     cost_b=0.05,
     cost_c=0.10,

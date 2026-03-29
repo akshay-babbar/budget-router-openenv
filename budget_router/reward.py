@@ -162,10 +162,13 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
     # Adaptation score: measures post-degradation success rate.
     # Directly measures whether the agent detected and adapted to degradation.
     adaptation_score = 0.0
-    degradation_start = int(history[0].get("degradation_start_step", 999) or 999)
+    _raw_degrade = history[0].get("degradation_start_step")
+    degradation_start = int(_raw_degrade) if _raw_degrade is not None else 999
     if degradation_start < 999:
+        # Use max(degradation_start, 1) to ensure at least one warm-up step
+        # before post-degradation tracking, even when degradation_start=0
         post_degrade = [h for h in history if h.get("action_type") != "shed_load"
-                        and int(h.get("step", 0)) > degradation_start]
+                        and int(h.get("step", 0)) > max(degradation_start, 1)]
         if post_degrade:
             post_successes = sum(1 for h in post_degrade if h.get("request_succeeded", False))
             adaptation_score = post_successes / len(post_degrade)

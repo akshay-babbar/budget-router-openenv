@@ -177,7 +177,7 @@ Defined in `budget_router/tasks.py`:
 | `easy` | `1.00` | None | Routing quality matters; always-A fails on heldout seeds |
 | `medium` | `0.95` | A degrades after step 5 (rate 0.15) | Must detect A's degradation and switch routing |
 | `hard` | `0.85` | A degrades from step 0 (rate 0.15), high noise (σ=50ms) | Tight budget + immediate degradation + noise |
-| `hard_multi` | `1.00` | A degrades from step 0 (rate 0.12), B degrades from step 10 (rate 0.10) | Multi-provider failure cascade |
+| `hard_multi` | `1.10` | A degrades from step 0 (rate 0.12), B degrades from step 10 (rate 0.10) | Multi-provider failure cascade |
 
 All tasks use `max_steps=20`, `max_queue_backlog=10`, `sla_ceiling_ms=500.0`.
 
