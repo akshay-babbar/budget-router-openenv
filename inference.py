@@ -27,6 +27,20 @@ TASKS: Dict[str, TaskConfig] = {
 VALID_ACTIONS = [action.value for action in ActionType]
 
 
+import re
+
+_VALID_ACTIONS = ["route_to_a", "route_to_b", "route_to_c", "shed_load"]
+
+
+def _parse_llm_action(response_text: str) -> str:
+    """Parse LLM response into a valid action string. Returns shed_load as safe fallback."""
+    text = response_text.strip().lower()
+    for action in _VALID_ACTIONS:
+        if action in text:
+            return action
+    return "shed_load"  # safe fallback: never crashes, never invalid
+
+
 class LLMRouter:
     def __init__(self, api_base_url: str, model_name: str, api_key: str) -> None:
         self._client = OpenAI(base_url=api_base_url, api_key=api_key)
@@ -63,51 +77,47 @@ STRATEGY HINTS:
 - Watch budget_remaining — if it's critically low (<0.15), avoid expensive providers.
 - The optimal strategy adapts routing as providers degrade; never locks onto one provider.
 
-Respond with EXACTLY one of: route_to_a, route_to_b, route_to_c, shed_load"""
+VALID ACTIONS (respond with exactly one of these four strings and nothing else):
+  route_to_a
+  route_to_b
+  route_to_c
+  shed_load"""
 
     def choose_action(self, observation: Observation) -> Action:
         prompt = self._build_prompt(observation)
-        completion = self._client.chat.completions.create(
-            model=self._model_name,
-            temperature=0,
-            messages=[
-                {"role": "system", "content": self._SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        content = (completion.choices[0].message.content or "").strip().lower()
-        for action_name in VALID_ACTIONS:
-            if action_name in content:
-                return Action(action=ActionType(action_name))
-        return heuristic_baseline_policy(observation)
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._model_name,
+                temperature=0,
+                messages=[
+                    {"role": "system", "content": self._SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            content = (completion.choices[0].message.content or "").strip().lower()
+            action_str = _parse_llm_action(content)
+        except Exception as e:
+            import sys
+            print(f"WARNING: LLM API call failed ({type(e).__name__}: {e}), falling back to shed_load", file=sys.stderr)
+            action_str = "shed_load"
+        return Action(action=ActionType(action_str))
 
     def _build_prompt(self, observation: Observation) -> str:
-        # Include both raw normalized values AND interpreted context
-        context = {
-            "step": round(observation.step_count * 20),
-            "budget_remaining_fraction": round(observation.budget_remaining, 3),
-            "budget_critically_low": observation.budget_remaining < 0.15,
-            "provider_a_status": round(observation.provider_a_status, 3),
-            "provider_a_healthy": observation.provider_a_status > 0.6,
-            "provider_b_status": round(observation.provider_b_status, 3),
-            "provider_b_healthy": observation.provider_b_status > 0.6,
-            "provider_c_status": round(observation.provider_c_status, 3),
-            "queue_backlog_fraction": round(observation.queue_backlog, 3),
-            "latency_fraction_of_sla": round(observation.system_latency, 3),
-            "sla_at_risk": observation.system_latency > 0.7,
-            "valid_actions": VALID_ACTIONS,
-            "action_costs": {
-                "route_to_a": "$0.01",
-                "route_to_b": "$0.05",
-                "route_to_c": "$0.10",
-                "shed_load": "$0.00 (flat -0.5 penalty)",
-            },
-        }
-        return (
-            "Current environment state:\n"
-            + json.dumps(context, indent=2)
-            + "\n\nChoose the best action. Reply with exactly one action name."
-        )
+        step = round(observation.step_count * 20)
+        lines = [
+            "Current environment state:",
+            f"  step: {step} / 20",
+            f"  provider_a_status: {observation.provider_a_status:.3f} ({'healthy' if observation.provider_a_status > 0.6 else 'DEGRADED'})",
+            f"  provider_b_status: {observation.provider_b_status:.3f} ({'healthy' if observation.provider_b_status > 0.6 else 'DEGRADED'})",
+            f"  provider_c_status: {observation.provider_c_status:.3f} ({'healthy' if observation.provider_c_status > 0.6 else 'DEGRADED'})",
+            f"  budget_remaining: {observation.budget_remaining:.3f} ({'CRITICAL' if observation.budget_remaining < 0.15 else 'ok'})",
+            f"  queue_backlog: {observation.queue_backlog:.3f}",
+            f"  system_latency: {observation.system_latency:.3f} ({'SLA AT RISK' if observation.system_latency > 0.7 else 'ok'})",
+            "",
+            "Choose the best action. Reply with exactly one action name:",
+            "  route_to_a | route_to_b | route_to_c | shed_load",
+        ]
+        return "\n".join(lines)
 
 
 def select_policy(policy_name: Literal["heuristic", "llm"]) -> object:

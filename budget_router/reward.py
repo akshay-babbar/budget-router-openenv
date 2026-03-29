@@ -125,6 +125,41 @@ def episode_metrics(history: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Compute episode-level grader score in [0, 1] with weighted breakdown.
+
+    overall = 0.30 × success_score
+            + 0.20 × latency_score
+            + 0.15 × budget_score
+            + 0.15 × sla_score
+            + 0.20 × adaptation_score
+
+    Component definitions:
+        success_score: Fraction of routed (non-shed) requests that succeeded.
+        latency_score: 1.0 - (avg_latency / sla_ceiling), clamped to [0, 1].
+        budget_score:  Fraction of initial budget NOT spent, clamped to [0, 1].
+        sla_score:     Fraction of routed requests with latency <= sla_ceiling.
+        adaptation_score: Post-degradation success rate — measures whether the
+            agent detected and adapted to provider degradation.
+
+    Adaptation score window semantics by task:
+        - easy (no degradation):  No post-degradation window exists.
+            adaptation_score = 1.0 (adaptation not required → full marks).
+        - medium (A degrades after step 5): Window = routing steps with
+            step > 5. Measures success rate after A begins failing.
+        - hard (A degrades from step 0): Window = routing steps with
+            step > 1 (one warm-up step allowed). Covers nearly all steps.
+        - hard_multi (A from step 0, B from step 10): Same primary window
+            as hard (based on primary degradation_start_step=0).
+
+    All component scores are clamped to [0.0, 1.0].
+
+    Args:
+        history: List of step info dicts from the episode.
+
+    Returns:
+        Dict with 'overall_score' and per-component breakdown.
+    """
     if not history:
         return {
             "overall_score": 0.0,
@@ -172,6 +207,9 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
         if post_degrade:
             post_successes = sum(1 for h in post_degrade if h.get("request_succeeded", False))
             adaptation_score = post_successes / len(post_degrade)
+    else:
+        # No degradation event: adaptation not required, award full marks.
+        adaptation_score = 1.0
 
     overall = (
         0.3 * success_score
