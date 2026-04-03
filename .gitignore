@@ -16,3 +16,4 @@ build/
 ._*
 merged_codebase.txt
 docs/
+*.json
