@@ -1,22 +1,17 @@
-from openenv_core.env_server import create_app
 import os
+
 import uvicorn
+
+from openenv_core.env_server.web_interface import create_web_interface_app
 
 from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, Observation
 
-app = create_app(
+app = create_web_interface_app(
     BudgetRouterEnv(emit_structured_logs=True),
     Action,
     Observation,
-    env_name="budget_router",
 )
-
-
-@app.get("/", include_in_schema=False)
-def root() -> dict[str, str]:
-    web_path = "/web" if os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in {"true", "1", "yes"} else "/docs"
-    return {"status": "ok", "web": web_path, "health": "/health"}
 
 
 def main(host: str = "0.0.0.0", port: int | None = None) -> None:

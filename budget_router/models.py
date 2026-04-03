@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from openenv_core.env_server.types import (
     Action as BaseAction,
@@ -33,7 +33,7 @@ class Action(BaseAction):
     Extends OpenEnv Action (which provides `metadata` field).
     """
 
-    action_type: ActionType
+    action_type: Literal["route_to_a", "route_to_b", "route_to_c", "shed_load"]
 
     def __post_init__(self) -> None:
         if isinstance(self.action_type, str):
