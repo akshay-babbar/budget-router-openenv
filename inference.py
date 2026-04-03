@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, Iterable, List, Literal
+from typing import Any, Callable, Dict, Iterable, List, Literal
 
 import typer
 from openai import OpenAI
@@ -11,8 +11,6 @@ from budget_router.models import Action, ActionType, Observation, TaskConfig
 from budget_router.policies import heuristic_baseline_policy
 from budget_router.reward import episode_metrics, grade_episode
 from budget_router.tasks import EASY, HARD, HARD_MULTI, MEDIUM
-
-import re
 
 _VALID_ACTIONS = ["route_to_a", "route_to_b", "route_to_c", "shed_load"]
 
@@ -44,6 +42,10 @@ SYSTEM_PROMPT = """You are an incident-response routing agent controlling a
     - Never respond with anything other than one of the four action strings above."""
 
 app = typer.Typer(add_completion=False)
+
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 SEED_SETS: Dict[str, List[int]] = {
     "development": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -97,39 +99,118 @@ class LLMRouter:
         return Action(action=ActionType(action_str))
 
 
+def _emit_log(prefix: str, payload: Dict[str, Any]) -> None:
+    print(f"{prefix} {json.dumps(payload)}", flush=True)
+
+
+def _observation_payload(observation: Observation) -> Dict[str, float]:
+    return {
+        "provider_a_status": float(observation.provider_a_status),
+        "provider_b_status": float(observation.provider_b_status),
+        "provider_c_status": float(observation.provider_c_status),
+        "budget_remaining": float(observation.budget_remaining),
+        "queue_backlog": float(observation.queue_backlog),
+        "system_latency": float(observation.system_latency),
+        "step_count": float(observation.step_count),
+    }
+
+
+def log_start(task: str, seed: int, episode: int) -> None:
+    _emit_log("[START]", {"task": task, "seed": seed, "episode": episode})
+
+
+def log_step(step: int, action: str, reward: float, done: bool, observation: Observation) -> None:
+    _emit_log(
+        "[STEP]",
+        {
+            "step": step,
+            "action": action,
+            "reward": float(reward),
+            "done": bool(done),
+            "observation": _observation_payload(observation),
+        },
+    )
+
+
+def log_end(task: str, seed: int, episode: int, total_reward: float, grade: float) -> None:
+    _emit_log(
+        "[END]",
+        {
+            "task": task,
+            "seed": seed,
+            "episode": episode,
+            "total_reward": float(total_reward),
+            "grade": float(grade),
+        },
+    )
+
+
 def select_policy(policy_name: Literal["heuristic", "llm"]) -> object:
     if policy_name == "heuristic":
         return heuristic_baseline_policy
 
-    api_base_url = os.environ.get("API_BASE_URL")
-    model_name = os.environ.get("MODEL_NAME")
-    api_key = os.environ.get("HF_TOKEN")
-    if not api_base_url or not model_name or not api_key:
+    if not HF_TOKEN:
         raise RuntimeError(
-            "LLM policy requires API_BASE_URL, MODEL_NAME, and HF_TOKEN environment variables."
+            "LLM policy requires HF_TOKEN and reads API_BASE_URL and MODEL_NAME from environment variables."
         )
-    return LLMRouter(api_base_url=api_base_url, model_name=model_name, api_key=api_key)
+    return LLMRouter(api_base_url=API_BASE_URL, model_name=MODEL_NAME, api_key=HF_TOKEN)
 
 
-def run_episode(env: BudgetRouterEnv, scenario: TaskConfig, seed: int, policy_name: Literal["heuristic", "llm"]) -> Dict[str, float]:
-    policy = select_policy(policy_name)
-    observation = env.reset(seed=seed, scenario=scenario)
+def choose_action(policy_name: Literal["heuristic", "llm"], policy: object, observation: Observation) -> Action:
+    if policy_name == "heuristic":
+        return policy(observation)
+    return policy.choose_action(observation)
+
+
+def run_episode(
+    env: BudgetRouterEnv,
+    scenario: TaskConfig,
+    seed: int,
+    episode: int,
+    policy_name: Literal["heuristic", "llm"],
+    policy: object,
+) -> Dict[str, Any]:
     total_reward = 0.0
-    while not observation.done:
-        if policy_name == "heuristic":
-            action = policy(observation)
-        else:
-            action = policy.choose_action(observation)
-        observation = env.step(action)
-        total_reward += float(observation.reward or 0.0)
-    metrics = episode_metrics(env._internal.history)
-    metrics["total_reward"] = round(total_reward, 4)
-    metrics["episode_length"] = env._internal.current_step
-    # Add grader score (0.0-1.0) for each episode
-    grader = grade_episode(env._internal.history)
-    metrics["grader_score"] = grader["overall_score"]
-    metrics["grader_breakdown"] = grader
-    return metrics
+    grader_score: float | None = None
+
+    log_start(task=scenario.name, seed=seed, episode=episode)
+
+    try:
+        observation = env.reset(seed=seed, scenario=scenario)
+        while not observation.done:
+            action = choose_action(policy_name=policy_name, policy=policy, observation=observation)
+            action_name = action.action.value
+            observation = env.step(action)
+            reward = float(observation.reward or 0.0)
+            total_reward += reward
+            log_step(
+                step=env._internal.current_step,
+                action=action_name,
+                reward=reward,
+                done=bool(observation.done),
+                observation=observation,
+            )
+
+        metrics = episode_metrics(env._internal.history)
+        metrics["seed"] = seed
+        metrics["episode"] = episode
+        metrics["total_reward"] = round(total_reward, 4)
+        metrics["episode_length"] = env._internal.current_step
+        grader = grade_episode(env._internal.history)
+        grader_score = float(grader["overall_score"])
+        metrics["grader_score"] = grader_score
+        metrics["grader_breakdown"] = grader
+        return metrics
+    finally:
+        if grader_score is None:
+            grader_score = float(grade_episode(env._internal.history)["overall_score"])
+        log_end(
+            task=scenario.name,
+            seed=seed,
+            episode=episode,
+            total_reward=round(total_reward, 4),
+            grade=grader_score,
+        )
 
 
 def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
@@ -150,15 +231,26 @@ def main(
     scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("all"),
     output_path: Path = typer.Option(Path("baseline_results.json")),
 ) -> None:
-    env = BudgetRouterEnv()
+    selected_policy = select_policy(policy)
     selected_tasks = TASKS if scenario == "all" else {scenario: TASKS[scenario]}
     results: Dict[str, Dict[str, object]] = {}
+    episode = 1
 
     for task_name, task_config in selected_tasks.items():
-        task_metrics = [
-            run_episode(env=env, scenario=task_config, seed=seed, policy_name=policy)
-            for seed in SEED_SETS[seed_set]
-        ]
+        task_metrics = []
+        for seed in SEED_SETS[seed_set]:
+            env = BudgetRouterEnv()
+            task_metrics.append(
+                run_episode(
+                    env=env,
+                    scenario=task_config,
+                    seed=seed,
+                    episode=episode,
+                    policy_name=policy,
+                    policy=selected_policy,
+                )
+            )
+            episode += 1
         results[task_name] = {
             "policy": policy,
             "seed_set": seed_set,
@@ -166,8 +258,7 @@ def main(
             "episodes": task_metrics,
         }
 
-    output_path.write_text(json.dumps(results, indent=2))
-    typer.echo(json.dumps(results, indent=2))
+    output_path.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":
