@@ -179,6 +179,9 @@ class BudgetRouterEnv(Environment):
                 metadata=getattr(action, "metadata", {}),
             )
 
+        if not self._internal.providers:
+            self.reset(seed=self._current_seed, scenario=self._config)
+
         self._internal.current_step += 1
         action_type = action.action_type.value
 

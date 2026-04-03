@@ -78,6 +78,16 @@ class TestCoreCorrectness:
         assert isinstance(obs.done, bool)
         assert isinstance(obs.reward, (int, float))
 
+    def test_step_before_reset_no_crash(self):
+        """step() before reset() auto-initializes so the default OpenEnv web UI is safe."""
+        env = BudgetRouterEnv()
+        action = Action(action_type=ActionType.ROUTE_TO_A)
+        obs = env.step(action)
+
+        assert isinstance(obs, Observation)
+        assert isinstance(obs.done, bool)
+        assert isinstance(obs.reward, (int, float))
+
     def test_episode_terminates_at_or_before_20(self):
         """Episode terminates at or before step 20."""
         env = BudgetRouterEnv()
