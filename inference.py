@@ -96,7 +96,7 @@ class LLMRouter:
             import sys
             print(f"[llm_policy] API error — defaulting to shed_load: {e}", file=sys.stderr)
             action_str = "shed_load"
-        return Action(action=ActionType(action_str))
+        return Action(action_type=ActionType(action_str))
 
 
 def _emit_log(prefix: str, payload: Dict[str, Any]) -> None:
@@ -179,7 +179,7 @@ def run_episode(
         observation = env.reset(seed=seed, scenario=scenario)
         while not observation.done:
             action = choose_action(policy_name=policy_name, policy=policy, observation=observation)
-            action_name = action.action.value
+            action_name = action.action_type.value
             observation = env.step(action)
             reward = float(observation.reward or 0.0)
             total_reward += reward

@@ -91,7 +91,7 @@ def run_and_trace(
         trace["budget_pct"].append(s.budget_dollars / initial_budget if initial_budget > 0 else 0)
         trace["reward"].append(reward)
         trace["cumulative_reward"].append(cumulative)
-        trace["action"].append(action.action.value)
+        trace["action"].append(action.action_type.value)
         trace["latency_ms"].append(s.last_latency_ms)
         trace["queue_backlog"].append(s.queue_backlog_count)
 

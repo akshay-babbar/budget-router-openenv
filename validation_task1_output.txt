@@ -1,0 +1,209 @@
+Running validation on DEVELOPMENT seeds...
+
+==========================================================================================
+  VALIDATION RESULTS — DEVELOPMENT SEEDS
+==========================================================================================
+
+  Task: EASY
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                   3.15     4.52    -6.00     8.70     0.90   0.8860    172.1
+  heuristic_baseline       7.88     3.18     3.80    13.00     0.85   0.6240    163.9
+  upper_bound             10.10     3.30     6.20    15.20     0.92   0.9600    169.0
+  always_route_a           4.00     5.69    -8.00    13.00     0.75   0.2000    165.6
+  always_route_b           0.05     2.75    -4.75     4.25     0.88   1.0000    160.9
+  always_route_c          -5.30     0.90    -8.00    -5.00     0.90   1.1000    182.4
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+  Task: MEDIUM
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                  -6.75     5.30   -16.74     1.76     0.73   0.8810    208.1
+  heuristic_baseline       3.72     4.36    -4.79     9.16     0.81   0.7240    188.7
+  upper_bound              9.49     4.34     3.79    15.79     0.90   0.8000    165.2
+  always_route_a         -22.02     3.89   -26.37   -14.13     0.32   0.2000    335.2
+  always_route_b          -1.24     3.61    -5.74     3.26     0.87   0.9500    164.2
+  always_route_c          -6.04     0.90    -8.74    -5.74     0.89   1.0000    180.7
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+  Task: HARD
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                 -13.15     4.66   -21.26    -6.64     0.65   0.8450    237.9
+  heuristic_baseline       0.01     5.93   -11.47     9.06     0.81   0.8300    188.2
+  upper_bound              6.57     2.12     3.16    10.62     0.88   0.8290    174.3
+  always_route_a         -31.48     3.47   -35.34   -24.06     0.17   0.2000    413.6
+  always_route_b          -2.31     1.80    -4.71     1.29     0.87   0.8500    159.3
+  always_route_c          -7.01     0.90    -9.71    -6.71     0.88   0.9000    181.6
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+  Task: HARD_MULTI
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                  -9.27     4.85   -18.32    -3.59     0.60   0.8870    282.5
+  heuristic_baseline      -2.38     2.75    -7.61     1.86     0.73   0.9910    243.2
+  upper_bound              4.90     2.38     1.73     7.73     0.89   1.0450    194.2
+  always_route_a         -31.29     2.62   -36.34   -26.25     0.17   0.2000    413.8
+  always_route_b          -8.62     4.29   -15.47     0.45     0.60   1.0000    282.5
+  always_route_c          -4.30     0.90    -7.00    -4.00     0.91   1.2000    189.2
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+==========================================================================================
+
+Running validation on HELD-OUT seeds...
+
+==========================================================================================
+  VALIDATION RESULTS — HELDOUT SEEDS
+==========================================================================================
+
+  Task: EASY
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                   2.29     5.05    -6.35     9.20     0.93   0.8420    164.4
+  heuristic_baseline       9.08     2.67     4.60    13.00     0.88   0.7440    165.1
+  upper_bound              9.80     2.94     6.20    15.20     0.91   0.9600    169.8
+  always_route_a           5.80     4.87    -2.00    13.00     0.78   0.2000    155.7
+  always_route_b          -1.15     2.94    -4.75     4.25     0.86   1.0000    164.3
+  always_route_c          -5.00     0.00    -5.00    -5.00     0.91   1.1000    179.2
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+  Task: MEDIUM
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                  -2.62     3.51    -9.08     0.79     0.82   0.8220    200.1
+  heuristic_baseline       2.41     6.47    -4.79    12.16     0.83   0.8160    176.4
+  upper_bound              9.19     4.80     0.79    12.79     0.89   0.8000    163.7
+  always_route_a         -21.32     4.08   -26.12   -14.09     0.33   0.2000    332.4
+  always_route_b          -2.14     2.94    -5.74     0.26     0.85   0.9500    166.0
+  always_route_c          -5.74     0.00    -5.74    -5.74     0.90   1.0000    182.9
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+  Task: HARD
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                  -6.98     3.60   -10.32    -2.47     0.76   0.8020    198.4
+  heuristic_baseline      -1.71     4.53    -6.76     6.53     0.84   0.8400    165.8
+  upper_bound              6.73     4.78     0.18    13.62     0.88   0.8280    169.8
+  always_route_a         -34.61     1.54   -35.95   -32.67     0.12   0.2000    428.7
+  always_route_b          -1.71     2.68    -4.71     1.29     0.88   0.8500    151.2
+  always_route_c          -6.71     0.00    -6.71    -6.71     0.89   0.9000    172.6
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+  Task: HARD_MULTI
+  Policy                   Mean      Std      Min      Max  SucRate     Cost  Lat(ms)
+  ----------------------------------------------------------------------------
+  random                  -6.10     6.37   -17.01     1.64     0.70   0.8420    240.9
+  heuristic_baseline      -1.25     2.56    -5.59     1.59     0.74   1.0400    224.1
+  upper_bound              5.33     2.25     1.73     7.73     0.89   1.0500    186.4
+  always_route_a         -32.48     2.00   -35.63   -29.33     0.15   0.2000    416.1
+  always_route_b          -9.03     3.47   -15.27    -5.57     0.60   1.0000    283.6
+  always_route_c          -4.60     1.20    -7.00    -4.00     0.90   1.2000    182.8
+  always_shed_load       -10.00     0.00   -10.00   -10.00     0.00   0.0000      0.0
+
+==========================================================================================
+
+───────────────────────────────────────────────────────────────────────────────────────────────
+  MANUAL TRACE — Scenario: MEDIUM, Seed: 42, Policy: heuristic_baseline
+───────────────────────────────────────────────────────────────────────────────────────────────
+  Step | Action     | A_health | B_health | C_health |  Latency |  Budget$ |  Reward |   Cumul
+  ───────────────────────────────────────────────────────────────────────────────────────────
+     1 | route_to_a |    0.850 |    0.920 |    0.990 |    124ms | $   0.94 |   +0.95 |   +0.95
+     2 | route_to_a |    0.850 |    0.920 |    0.990 |    104ms | $   0.93 |   +0.95 |   +1.89
+     3 | route_to_a |    0.850 |    0.920 |    0.990 |     72ms | $   0.92 |   +0.95 |   +2.84
+     4 | route_to_a |    0.850 |    0.920 |    0.990 |     43ms | $   0.91 |   +0.95 |   +3.79
+     5 | route_to_a |    0.704 |    0.920 |    0.990 |    103ms | $   0.90 |   +0.95 |   +4.74
+     6 | route_to_a |    0.559 |    0.920 |    0.990 |    100ms | $   0.89 |   +0.95 |   +5.68
+     7 | route_to_a |    0.424 |    0.920 |    0.990 |     70ms | $   0.88 |   +0.95 |   +6.63
+     8 | route_to_a |    0.305 |    0.920 |    0.990 |     71ms | $   0.87 |   +0.95 |   +7.58
+     9 | route_to_a |    0.144 |    0.920 |    0.990 |    344ms | $   0.86 |   -2.05 |   +5.53
+    10 | route_to_a |    0.050 |    0.920 |    0.990 |    399ms | $   0.85 |   -2.05 |   +3.47
+    11 | route_to_a |    0.050 |    0.920 |    0.990 |    369ms | $   0.84 |   -2.05 |   +1.42
+    12 | route_to_b |    0.050 |    0.920 |    0.990 |    152ms | $   0.79 |   +0.74 |   +2.16
+    13 | route_to_b |    0.050 |    0.920 |    0.990 |    165ms | $   0.74 |   +0.74 |   +2.89
+    14 | route_to_b |    0.050 |    0.920 |    0.990 |    158ms | $   0.69 |   +0.74 |   +3.63
+    15 | route_to_b |    0.050 |    0.920 |    0.990 |    138ms | $   0.64 |   +0.74 |   +4.37
+    16 | route_to_b |    0.050 |    0.920 |    0.990 |    172ms | $   0.59 |   +0.74 |   +5.11
+    17 | route_to_b |    0.050 |    0.920 |    0.990 |    169ms | $   0.54 |   +0.74 |   +5.84
+    18 | route_to_b |    0.050 |    0.920 |    0.990 |    192ms | $   0.49 |   +0.74 |   +6.58
+    19 | route_to_b |    0.050 |    0.920 |    0.990 |    165ms | $   0.44 |   +0.74 |   +7.32
+    20 | route_to_b |    0.050 |    0.920 |    0.990 |    133ms | $   0.39 |   +0.74 |   +8.05
+  ───────────────────────────────────────────────────────────────────────────────────────────
+  EPISODE END | success_rate=0.85 | total_cost=$0.5600 | sla_met=True | total_reward=8.05
+───────────────────────────────────────────────────────────────────────────────────────────────
+
+
+───────────────────────────────────────────────────────────────────────────────────────────────
+  MANUAL TRACE — Scenario: HARD_MULTI, Seed: 42, Policy: heuristic_baseline
+───────────────────────────────────────────────────────────────────────────────────────────────
+  Step | Action     | A_health | B_health | C_health |  Latency |  Budget$ |  Reward |   Cumul
+  ───────────────────────────────────────────────────────────────────────────────────────────
+     1 | route_to_a |    0.733 |    0.920 |    0.990 |     91ms | $   1.09 |   +0.95 |   +0.95
+     2 | route_to_a |    0.607 |    0.920 |    0.990 |    381ms | $   1.08 |   -2.05 |   -1.09
+     3 | route_to_b |    0.481 |    0.920 |    0.990 |    150ms | $   1.03 |   +0.77 |   -0.32
+     4 | route_to_b |    0.347 |    0.920 |    0.990 |    164ms | $   0.98 |   +0.77 |   +0.45
+     5 | route_to_b |    0.214 |    0.920 |    0.990 |    156ms | $   0.93 |   +0.77 |   +1.23
+     6 | route_to_b |    0.107 |    0.920 |    0.990 |    140ms | $   0.88 |   +0.77 |   +2.00
+     7 | route_to_b |    0.050 |    0.920 |    0.990 |    145ms | $   0.83 |   +0.77 |   +2.77
+     8 | route_to_b |    0.050 |    0.920 |    0.990 |    107ms | $   0.78 |   +0.77 |   +3.55
+     9 | route_to_b |    0.050 |    0.920 |    0.990 |    138ms | $   0.73 |   +0.77 |   +4.32
+    10 | route_to_b |    0.050 |    0.798 |    0.990 |    178ms | $   0.68 |   +0.77 |   +5.09
+    11 | route_to_b |    0.050 |    0.750 |    0.990 |    120ms | $   0.63 |   +0.77 |   +5.86
+    12 | route_to_b |    0.050 |    0.662 |    0.990 |    192ms | $   0.58 |   +0.77 |   +6.64
+    13 | route_to_b |    0.050 |    0.564 |    0.990 |    135ms | $   0.53 |   +0.77 |   +7.41
+    14 | route_to_b |    0.050 |    0.456 |    0.990 |    182ms | $   0.48 |   +0.77 |   +8.18
+    15 | route_to_b |    0.050 |    0.369 |    0.990 |    386ms | $   0.43 |   -2.23 |   +5.95
+    16 | route_to_b |    0.050 |    0.253 |    0.990 |    430ms | $   0.38 |   -2.23 |   +3.73
+    17 | route_to_b |    0.050 |    0.138 |    0.990 |    505ms | $   0.33 |   -2.24 |   +1.49
+    18 | route_to_c |    0.050 |    0.050 |    0.990 |    168ms | $   0.23 |   +0.55 |   +2.03
+    19 | route_to_c |    0.050 |    0.050 |    0.990 |    160ms | $   0.13 |   +0.55 |   +2.58
+    20 | route_to_c |    0.050 |    0.050 |    0.990 |    275ms | $   0.03 |   +0.55 |   +3.13
+  ───────────────────────────────────────────────────────────────────────────────────────────
+  EPISODE END | success_rate=0.80 | total_cost=$1.0700 | sla_met=False | total_reward=3.13
+───────────────────────────────────────────────────────────────────────────────────────────────
+
+
+============================================================
+  RUNNING HARD ASSERTION CHECKS
+============================================================
+  ✅ PASS: [dev/easy] baseline (7.88) > random (3.15)
+  ✅ PASS: [dev/easy] oracle (10.10) >= baseline (7.88)
+  ✅ PASS: [dev/medium] baseline (3.72) > random (-6.75)
+  ✅ PASS: [dev/medium] oracle (9.49) >= baseline (3.72)
+  ✅ PASS: [dev/hard] baseline (0.01) > random (-13.15)
+  ✅ PASS: [dev/hard] oracle (6.57) >= baseline (0.01)
+  ✅ PASS: [dev/hard_multi] oracle (4.90) >= baseline (-2.38)
+  ✅ PASS: [heldout/easy] baseline (9.08) > random (2.29)
+  ✅ PASS: [heldout/easy] oracle (9.80) >= baseline (9.08)
+  ✅ PASS: [heldout/medium] baseline (2.41) > random (-2.62)
+  ✅ PASS: [heldout/medium] oracle (9.19) >= baseline (2.41)
+  ✅ PASS: [heldout/hard] baseline (-1.71) > random (-6.98)
+  ✅ PASS: [heldout/hard] oracle (6.73) >= baseline (-1.71)
+  ✅ PASS: [heldout/hard_multi] oracle (5.33) >= baseline (-1.25)
+  ✅ PASS: At least one task has >20% gap between baseline and random
+  ✅ PASS: Oracle positive reward on easy (10.10)
+  ✅ PASS: Oracle success rate on easy (0.92) > 0.5
+  ✅ PASS: [dev/easy] baseline (7.88) >= always_a (4.00)
+  ✅ PASS: [dev/easy] baseline (7.88) >= always_b (0.05)
+  ✅ PASS: [dev/easy] baseline (7.88) >= always_shed (-10.00)
+  ✅ PASS: [dev/medium] baseline (3.72) >= always_a (-22.02)
+  ✅ PASS: [dev/medium] baseline (3.72) >= always_b (-1.24)
+  ✅ PASS: [dev/medium] baseline (3.72) >= always_shed (-10.00)
+  ✅ PASS: [dev/hard] baseline (0.01) >= always_a (-31.48)
+  ✅ PASS: [dev/hard] baseline (0.01) >= always_b (-2.31)
+  ✅ PASS: [dev/hard] baseline (0.01) >= always_shed (-10.00)
+  ✅ PASS: [dev/easy] heuristic provides strategic advantage over degenerate policies
+  ✅ PASS: [dev/medium] heuristic provides strategic advantage over degenerate policies
+  ✅ PASS: [dev/hard] heuristic provides strategic advantage over degenerate policies
+  ✅ PASS: [dev/hard_multi] heuristic provides strategic advantage over degenerate policies
+  ✅ PASS: [easy] baseline stable: dev=7.88, heldout=9.08, margin=3.15
+  ✅ PASS: [medium] baseline stable: dev=3.72, heldout=2.41, margin=2.00
+  ✅ PASS: [hard] baseline stable: dev=0.01, heldout=-1.71, margin=2.00
+  ✅ PASS: [hard_multi] baseline stable: dev=-2.38, heldout=-1.25, margin=2.00
+  ✅ PASS: No NaN rewards across 315 episodes
+  ✅ PASS: No episode exceeds 20 steps (max seen: 20)
+
+============================================================
+  RESULTS: 36/36 passed, 0/36 failed
+============================================================
+
+  🎉 All assertions passed! Environment is ready for submission.

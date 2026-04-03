@@ -71,7 +71,7 @@ class TestCoreCorrectness:
         """step() after reset() does not crash and returns valid types."""
         env = BudgetRouterEnv()
         obs = env.reset(seed=42, scenario=EASY)
-        action = Action(action=ActionType.ROUTE_TO_A)
+        action = Action(action_type=ActionType.ROUTE_TO_A)
         obs = env.step(action)
 
         assert isinstance(obs, Observation)
@@ -85,7 +85,7 @@ class TestCoreCorrectness:
             obs = env.reset(seed=42, scenario=scenario)
             steps = 0
             while not obs.done and steps < 25:  # give extra margin to catch bugs
-                action = Action(action=ActionType.ROUTE_TO_B)
+                action = Action(action_type=ActionType.ROUTE_TO_B)
                 obs = env.step(action)
                 steps += 1
             assert steps <= 20, f"Episode ran {steps} steps on {scenario.name}"
@@ -181,11 +181,11 @@ class TestRewardSanity:
         env = BudgetRouterEnv()
         env.reset(seed=42, scenario=EASY)
 
-        obs_a = env.step(Action(action=ActionType.ROUTE_TO_A))
+        obs_a = env.step(Action(action_type=ActionType.ROUTE_TO_A))
         cost_a = obs_a.metadata.get("cost", 0)
 
         env.reset(seed=42, scenario=EASY)
-        obs_c = env.step(Action(action=ActionType.ROUTE_TO_C))
+        obs_c = env.step(Action(action_type=ActionType.ROUTE_TO_C))
         cost_c = obs_c.metadata.get("cost", 0)
 
         assert cost_a < cost_c, f"cost_a ({cost_a}) >= cost_c ({cost_c})"

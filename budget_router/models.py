@@ -33,11 +33,11 @@ class Action(BaseAction):
     Extends OpenEnv Action (which provides `metadata` field).
     """
 
-    action: ActionType
+    action_type: ActionType
 
     def __post_init__(self) -> None:
-        if isinstance(self.action, str):
-            self.action = ActionType(self.action)
+        if isinstance(self.action_type, str):
+            self.action_type = ActionType(self.action_type)
 
 
 # =============================================================================

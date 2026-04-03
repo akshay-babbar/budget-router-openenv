@@ -1,0 +1,414 @@
+{
+  "easy": {
+    "policy": "heuristic",
+    "seed_set": "heldout",
+    "summary": {
+      "mean_reward": 9.08,
+      "mean_success_rate": 0.88,
+      "mean_cost": 0.744,
+      "mean_latency_ms": 165.13,
+      "mean_grader_score": 0.7863
+    },
+    "episodes": [
+      {
+        "total_reward": 4.6,
+        "success_rate": 0.8,
+        "total_cost_spent": 0.68,
+        "average_latency_ms": 191.66,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.7613,
+        "grader_breakdown": {
+          "overall_score": 0.7613,
+          "success_score": 0.8,
+          "latency_score": 0.6167,
+          "budget_score": 0.32,
+          "sla_score": 1.0,
+          "adaptation_score": 1.0
+        }
+      },
+      {
+        "total_reward": 9.4,
+        "success_rate": 0.9,
+        "total_cost_spent": 0.92,
+        "average_latency_ms": 171.63,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.7633,
+        "grader_breakdown": {
+          "overall_score": 0.7633,
+          "success_score": 0.9,
+          "latency_score": 0.6567,
+          "budget_score": 0.08,
+          "sla_score": 1.0,
+          "adaptation_score": 1.0
+        }
+      },
+      {
+        "total_reward": 13.0,
+        "success_rate": 0.9,
+        "total_cost_spent": 0.2,
+        "average_latency_ms": 112.31,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.8951,
+        "grader_breakdown": {
+          "overall_score": 0.8951,
+          "success_score": 0.9,
+          "latency_score": 0.7754,
+          "budget_score": 0.8,
+          "sla_score": 1.0,
+          "adaptation_score": 1.0
+        }
+      },
+      {
+        "total_reward": 9.2,
+        "success_rate": 0.9,
+        "total_cost_spent": 0.96,
+        "average_latency_ms": 180.06,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.754,
+        "grader_breakdown": {
+          "overall_score": 0.754,
+          "success_score": 0.9,
+          "latency_score": 0.6399,
+          "budget_score": 0.04,
+          "sla_score": 1.0,
+          "adaptation_score": 1.0
+        }
+      },
+      {
+        "total_reward": 9.2,
+        "success_rate": 0.9,
+        "total_cost_spent": 0.96,
+        "average_latency_ms": 169.99,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.758,
+        "grader_breakdown": {
+          "overall_score": 0.758,
+          "success_score": 0.9,
+          "latency_score": 0.66,
+          "budget_score": 0.04,
+          "sla_score": 1.0,
+          "adaptation_score": 1.0
+        }
+      }
+    ]
+  },
+  "medium": {
+    "policy": "heuristic",
+    "seed_set": "heldout",
+    "summary": {
+      "mean_reward": 2.4105,
+      "mean_success_rate": 0.83,
+      "mean_cost": 0.816,
+      "mean_latency_ms": 176.37,
+      "mean_grader_score": 0.7129
+    },
+    "episodes": [
+      {
+        "total_reward": 4.8421,
+        "success_rate": 0.8,
+        "total_cost_spent": 0.6,
+        "average_latency_ms": 178.24,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.7206,
+        "grader_breakdown": {
+          "overall_score": 0.7206,
+          "success_score": 0.8,
+          "latency_score": 0.6435,
+          "budget_score": 0.3684,
+          "sla_score": 1.0,
+          "adaptation_score": 0.7333
+        }
+      },
+      {
+        "total_reward": 12.1579,
+        "success_rate": 0.95,
+        "total_cost_spent": 0.92,
+        "average_latency_ms": 161.1,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.7753,
+        "grader_breakdown": {
+          "overall_score": 0.7753,
+          "success_score": 0.95,
+          "latency_score": 0.6778,
+          "budget_score": 0.0316,
+          "sla_score": 1.0,
+          "adaptation_score": 1.0
+        }
+      },
+      {
+        "total_reward": 4.6316,
+        "success_rate": 0.8,
+        "total_cost_spent": 0.64,
+        "average_latency_ms": 182.11,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.7128,
+        "grader_breakdown": {
+          "overall_score": 0.7128,
+          "success_score": 0.8,
+          "latency_score": 0.6358,
+          "budget_score": 0.3263,
+          "sla_score": 1.0,
+          "adaptation_score": 0.7333
+        }
+      },
+      {
+        "total_reward": -4.7895,
+        "success_rate": 0.8,
+        "total_cost_spent": 0.96,
+        "average_latency_ms": 180.9,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.6776,
+        "grader_breakdown": {
+          "overall_score": 0.6776,
+          "success_score": 0.8,
+          "latency_score": 0.6382,
+          "budget_score": 0.0,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8
+        }
+      },
+      {
+        "total_reward": -4.7895,
+        "success_rate": 0.8,
+        "total_cost_spent": 0.96,
+        "average_latency_ms": 179.5,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.6782,
+        "grader_breakdown": {
+          "overall_score": 0.6782,
+          "success_score": 0.8,
+          "latency_score": 0.641,
+          "budget_score": 0.0,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8
+        }
+      }
+    ]
+  },
+  "hard": {
+    "policy": "heuristic",
+    "seed_set": "heldout",
+    "summary": {
+      "mean_reward": -1.7059,
+      "mean_success_rate": 0.8367,
+      "mean_cost": 0.84,
+      "mean_latency_ms": 165.75,
+      "mean_grader_score": 0.7127
+    },
+    "episodes": [
+      {
+        "total_reward": -6.7647,
+        "success_rate": 0.7778,
+        "total_cost_spent": 0.86,
+        "average_latency_ms": 161.94,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 18,
+        "grader_score": 0.6833,
+        "grader_breakdown": {
+          "overall_score": 0.6833,
+          "success_score": 0.7778,
+          "latency_score": 0.6761,
+          "budget_score": 0.0,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8235
+        }
+      },
+      {
+        "total_reward": -3.7647,
+        "success_rate": 0.8333,
+        "total_cost_spent": 0.86,
+        "average_latency_ms": 168.99,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 18,
+        "grader_score": 0.7089,
+        "grader_breakdown": {
+          "overall_score": 0.7089,
+          "success_score": 0.8333,
+          "latency_score": 0.662,
+          "budget_score": 0.0,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8824
+        }
+      },
+      {
+        "total_reward": 6.5294,
+        "success_rate": 0.85,
+        "total_cost_spent": 0.76,
+        "average_latency_ms": 169.77,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.7214,
+        "grader_breakdown": {
+          "overall_score": 0.7214,
+          "success_score": 0.85,
+          "latency_score": 0.6605,
+          "budget_score": 0.1059,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8421
+        }
+      },
+      {
+        "total_reward": -0.7647,
+        "success_rate": 0.8889,
+        "total_cost_spent": 0.86,
+        "average_latency_ms": 158.22,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 18,
+        "grader_score": 0.7416,
+        "grader_breakdown": {
+          "overall_score": 0.7416,
+          "success_score": 0.8889,
+          "latency_score": 0.6836,
+          "budget_score": 0.0,
+          "sla_score": 1.0,
+          "adaptation_score": 0.9412
+        }
+      },
+      {
+        "total_reward": -3.7647,
+        "success_rate": 0.8333,
+        "total_cost_spent": 0.86,
+        "average_latency_ms": 169.83,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 18,
+        "grader_score": 0.7085,
+        "grader_breakdown": {
+          "overall_score": 0.7085,
+          "success_score": 0.8333,
+          "latency_score": 0.6603,
+          "budget_score": 0.0,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8824
+        }
+      }
+    ]
+  },
+  "hard_multi": {
+    "policy": "heuristic",
+    "seed_set": "heldout",
+    "summary": {
+      "mean_reward": -1.2513,
+      "mean_success_rate": 0.7368,
+      "mean_cost": 1.04,
+      "mean_latency_ms": 224.09,
+      "mean_grader_score": 0.6399
+    },
+    "episodes": [
+      {
+        "total_reward": -5.5909,
+        "success_rate": 0.6667,
+        "total_cost_spent": 1.01,
+        "average_latency_ms": 219.61,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.6156,
+        "grader_breakdown": {
+          "overall_score": 0.6156,
+          "success_score": 0.6667,
+          "latency_score": 0.5608,
+          "budget_score": 0.0818,
+          "sla_score": 1.0,
+          "adaptation_score": 0.7059
+        }
+      },
+      {
+        "total_reward": 0.1553,
+        "success_rate": 0.75,
+        "total_cost_spent": 1.06,
+        "average_latency_ms": 237.0,
+        "sla_met": false,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.636,
+        "grader_breakdown": {
+          "overall_score": 0.636,
+          "success_score": 0.75,
+          "latency_score": 0.526,
+          "budget_score": 0.0364,
+          "sla_score": 0.95,
+          "adaptation_score": 0.7895
+        }
+      },
+      {
+        "total_reward": -2.5909,
+        "success_rate": 0.7,
+        "total_cost_spent": 1.01,
+        "average_latency_ms": 225.76,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.6188,
+        "grader_breakdown": {
+          "overall_score": 0.6188,
+          "success_score": 0.7,
+          "latency_score": 0.5485,
+          "budget_score": 0.0818,
+          "sla_score": 1.0,
+          "adaptation_score": 0.6842
+        }
+      },
+      {
+        "total_reward": 1.5881,
+        "success_rate": 0.7895,
+        "total_cost_spent": 1.06,
+        "average_latency_ms": 208.66,
+        "sla_met": false,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.6676,
+        "grader_breakdown": {
+          "overall_score": 0.6676,
+          "success_score": 0.7895,
+          "latency_score": 0.5827,
+          "budget_score": 0.0364,
+          "sla_score": 0.9474,
+          "adaptation_score": 0.8333
+        }
+      },
+      {
+        "total_reward": 0.1818,
+        "success_rate": 0.7778,
+        "total_cost_spent": 1.06,
+        "average_latency_ms": 229.41,
+        "sla_met": true,
+        "queue_overflow_events": 0,
+        "episode_length": 20,
+        "grader_score": 0.6617,
+        "grader_breakdown": {
+          "overall_score": 0.6617,
+          "success_score": 0.7778,
+          "latency_score": 0.5412,
+          "budget_score": 0.0364,
+          "sla_score": 1.0,
+          "adaptation_score": 0.8235
+        }
+      }
+    ]
+  }
+}

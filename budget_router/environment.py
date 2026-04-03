@@ -175,12 +175,12 @@ class BudgetRouterEnv(Environment):
 
         if not isinstance(action, Action):
             action = Action(
-                action=getattr(action, "action"),
+                action_type=getattr(action, "action_type"),
                 metadata=getattr(action, "metadata", {}),
             )
 
         self._internal.current_step += 1
-        action_type = action.action.value
+        action_type = action.action_type.value
 
         # ── Apply degradation BEFORE processing the request ──
         self._degrade()

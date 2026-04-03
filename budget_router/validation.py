@@ -229,7 +229,7 @@ def run_manual_trace(
         budget = s.budget_dollars
 
         print(
-            f"  {steps:>4} | {action.action.value:<10} | "
+            f"  {steps:>4} | {action.action_type.value:<10} | "
             f"{a_health:>8.3f} | {b_health:>8.3f} | {c_health:>8.3f} | "
             f"{latency_ms:>6.0f}ms | ${budget:>7.2f} | "
             f"{reward:>+7.2f} | {cumulative:>+7.2f}"

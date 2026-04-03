@@ -24,7 +24,7 @@ def random_policy(obs: Observation, rng: Optional[stdlib_random.Random] = None) 
     """Uniform random over all 4 actions. No state awareness."""
     r = rng or stdlib_random.Random()
     choice = r.choice(list(ActionType))
-    return Action(action=choice)
+    return Action(action_type=choice)
 
 
 def heuristic_baseline_policy(obs: Observation) -> Action:
@@ -52,15 +52,15 @@ def heuristic_baseline_policy(obs: Observation) -> Action:
         # Only consider A ($0.01) and B ($0.05) — skip C
         for action_name, status in providers[:2]:
             if status > threshold:
-                return Action(action=ActionType(action_name))
-        return Action(action=ActionType.SHED_LOAD)
+                return Action(action_type=ActionType(action_name))
+        return Action(action_type=ActionType.SHED_LOAD)
 
     for action_name, status in providers:
         if status > threshold:
-            return Action(action=ActionType(action_name))
+            return Action(action_type=ActionType(action_name))
 
     # All providers below threshold → shed load
-    return Action(action=ActionType.SHED_LOAD)
+    return Action(action_type=ActionType.SHED_LOAD)
 
 
 def debug_upper_bound_policy(obs: Observation, internal_state: InternalState) -> Action:
@@ -116,26 +116,26 @@ def debug_upper_bound_policy(obs: Observation, internal_state: InternalState) ->
                     best_action = action_name
 
     if best_action is None or best_ev < -0.5:
-        return Action(action=ActionType.SHED_LOAD)
+        return Action(action_type=ActionType.SHED_LOAD)
 
-    return Action(action=ActionType(best_action))
+    return Action(action_type=ActionType(best_action))
 
 
 def always_route_a_policy(obs: Observation) -> Action:
     """Degenerate: always route to cheapest provider A."""
-    return Action(action=ActionType.ROUTE_TO_A)
+    return Action(action_type=ActionType.ROUTE_TO_A)
 
 
 def always_route_b_policy(obs: Observation) -> Action:
     """Degenerate: always route to balanced provider B."""
-    return Action(action=ActionType.ROUTE_TO_B)
+    return Action(action_type=ActionType.ROUTE_TO_B)
 
 
 def always_route_c_policy(obs: Observation) -> Action:
     """Degenerate: always route to most expensive/reliable provider C."""
-    return Action(action=ActionType.ROUTE_TO_C)
+    return Action(action_type=ActionType.ROUTE_TO_C)
 
 
 def always_shed_load_policy(obs: Observation) -> Action:
     """Degenerate: always shed load (never routes)."""
-    return Action(action=ActionType.SHED_LOAD)
+    return Action(action_type=ActionType.SHED_LOAD)
