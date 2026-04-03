@@ -9,6 +9,7 @@ degradation constraints.
 
 from __future__ import annotations
 
+import json
 import math
 import random
 import uuid
@@ -47,13 +48,31 @@ class BudgetRouterEnv(Environment):
         state -> EnvState
     """
 
-    def __init__(self) -> None:
+    def __init__(self, emit_structured_logs: bool = False) -> None:
         super().__init__()
         self._internal: InternalState = InternalState()
         self._config: TaskConfig = EASY
         self._rng: random.Random = random.Random()
         self._episode_id: str = ""
         self._cumulative_reward: float = 0.0
+        self._emit_structured_logs = emit_structured_logs
+        self._episode_number = 0
+        self._current_seed: Optional[int] = None
+
+    def _emit_log(self, prefix: str, payload: Dict[str, Any]) -> None:
+        if self._emit_structured_logs:
+            print(f"{prefix} {json.dumps(payload)}", flush=True)
+
+    def _observation_payload(self, observation: Observation) -> Dict[str, float]:
+        return {
+            "provider_a_status": float(observation.provider_a_status),
+            "provider_b_status": float(observation.provider_b_status),
+            "provider_c_status": float(observation.provider_c_status),
+            "budget_remaining": float(observation.budget_remaining),
+            "queue_backlog": float(observation.queue_backlog),
+            "system_latency": float(observation.system_latency),
+            "step_count": float(observation.step_count),
+        }
 
     # ─── OpenEnv interface ──────────────────────────────────────────────
 
@@ -79,6 +98,8 @@ class BudgetRouterEnv(Environment):
             self._rng = random.Random()
 
         self._episode_id = episode_id or str(uuid.uuid4())
+        self._episode_number += 1
+        self._current_seed = seed
         self._cumulative_reward = 0.0
 
         # Initialize providers
@@ -122,7 +143,16 @@ class BudgetRouterEnv(Environment):
             window_size=5,
         )
 
-        return self._get_obs()
+        observation = self._get_obs()
+        self._emit_log(
+            "[START]",
+            {
+                "task": self._config.name,
+                "seed": int(seed) if seed is not None else -1,
+                "episode": self._episode_number,
+            },
+        )
+        return observation
 
     def step(
         self,
@@ -230,6 +260,26 @@ class BudgetRouterEnv(Environment):
                 obs.done = True
                 obs.reward = reward
                 obs.metadata = step_info
+                self._emit_log(
+                    "[STEP]",
+                    {
+                        "step": self._internal.current_step,
+                        "action": action_type,
+                        "reward": float(reward),
+                        "done": bool(obs.done),
+                        "observation": self._observation_payload(obs),
+                    },
+                )
+                self._emit_log(
+                    "[END]",
+                    {
+                        "task": self._config.name,
+                        "seed": int(self._current_seed) if self._current_seed is not None else -1,
+                        "episode": self._episode_number,
+                        "total_reward": round(float(self._cumulative_reward), 4),
+                        "grade": 0.0,
+                    },
+                )
                 return obs
 
             # Determine if request succeeds (based on current_health)
@@ -316,6 +366,29 @@ class BudgetRouterEnv(Environment):
         obs.done = self._internal.episode_done
         obs.reward = reward
         obs.metadata = step_info
+
+        self._emit_log(
+            "[STEP]",
+            {
+                "step": self._internal.current_step,
+                "action": action_type,
+                "reward": float(reward),
+                "done": bool(obs.done),
+                "observation": self._observation_payload(obs),
+            },
+        )
+
+        if obs.done:
+            self._emit_log(
+                "[END]",
+                {
+                    "task": self._config.name,
+                    "seed": int(self._current_seed) if self._current_seed is not None else -1,
+                    "episode": self._episode_number,
+                    "total_reward": round(float(self._cumulative_reward), 4),
+                    "grade": 0.0,
+                },
+            )
 
         return obs
 

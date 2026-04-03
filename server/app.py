@@ -6,7 +6,7 @@ from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, Observation
 
 app = create_app(
-    BudgetRouterEnv(),
+    BudgetRouterEnv(emit_structured_logs=True),
     Action,
     Observation,
     env_name="budget_router",
