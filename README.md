@@ -14,7 +14,7 @@ pinned: false
 ### The Problem: The Reliability Trilemma
 Managing high-volume LLM workloads requires balancing three competing objectives: **Budget Efficiency**, **SLA Compliance**, and **Latency Minimization**. Traditional heuristics fail when providers exhibit non-stationary degradation. 
 
-**Budget-Router-OpenEnv** is a Gymnasium-compatible environment designed to train agents that can navigate these trade-offs in real-time.
+**Budget-Router-OpenEnv** is an OpenEnv-compatible RL environment exposing a Gymnasium-style `reset`/`step` API, designed to train agents that can navigate these trade-offs in real-time.
 
 ### Environment Dynamics
 The agent acts as a high-frequency router, observing provider health signals and remaining budget to make optimal routing decisions.
