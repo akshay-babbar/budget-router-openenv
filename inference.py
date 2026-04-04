@@ -24,22 +24,39 @@ def _parse_llm_action(response_text: str) -> str:
     return "shed_load"  # safe fallback: always valid, never crashes
 
 
-SYSTEM_PROMPT = """You are an incident-response routing agent controlling a 
-    production service. At each step you observe provider health metrics and must 
-    choose exactly one action.
+SYSTEM_PROMPT = """You are a cost-aware LLM API routing agent managing a production system.
+At each step, output EXACTLY ONE action string. Nothing else.
 
-    Valid actions — respond with ONLY one of these four strings, nothing else:
-      route_to_a
-      route_to_b
-      route_to_c
-      shed_load
+PROVIDERS AND COSTS:
+  provider_a_status: health of Provider A — costs $0.01/request (CHEAPEST)
+  provider_b_status: health of Provider B — costs $0.05/request
+  provider_c_status: health of Provider C — costs $0.10/request (10x cost of A)
+  budget_remaining: fraction of budget left [0=exhausted → -10 penalty, 1=full]
+  queue_backlog: pending requests (higher = more urgent to route)
+  system_latency: current latency pressure
+  step_count: episode progress [0=start, 1=end]
 
-    Decision rules:
-    - Prefer providers with windowed success rate above 0.52 and lower cost.
-    - If budget_remaining is below 0.20, prefer cheaper providers or shed_load.
-    - shed_load reduces backlog but costs -0.5 reward — use it when all providers 
-      are degraded, not as a default.
-    - Never respond with anything other than one of the four action strings above."""
+VALID ACTIONS (output ONLY one):
+  route_to_a
+  route_to_b
+  route_to_c
+  shed_load
+
+COST PRINCIPLES (reason from these, not a fixed lookup):
+- Budget exhaustion (budget_remaining → 0) triggers a -10 penalty that wipes all reward.
+  Protect budget: route_to_a when healthy, it costs 1/10th of route_to_c.
+- A provider is "healthy" when its status > 0.52. Below that, routing there risks failure.
+- shed_load is a last resort only when routing is impossible: every provider has status ≤ 0.52, OR budget cannot absorb even the cheapest available healthy provider. If any provider is healthy and affordable, shed_load is always the wrong choice.
+- When budget_remaining < 0.10, avoid route_to_c entirely regardless of its health.
+- Provider status changes over time — a degraded provider may recover later.
+
+REASONING APPROACH:
+1. Is any provider healthy (status > 0.52)?
+2. If yes: pick the cheapest healthy provider that fits the budget.
+3. If no: shed_load.
+4. Always protect budget_remaining — it is the binding constraint.
+
+Output only the action string."""
 
 app = typer.Typer(add_completion=False)
 
@@ -94,7 +111,7 @@ class LLMRouter:
             action_str = _parse_llm_action(raw)
         except Exception as e:
             import sys
-            print(f"[llm_policy] API error — defaulting to shed_load: {e}", file=sys.stderr)
+            print(f"[llm_error] step API_ERROR: {e}", file=sys.stdout, flush=True)
             action_str = "shed_load"
         return Action(action_type=ActionType(action_str))
 
