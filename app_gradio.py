@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, Protocol
 
 import gradio as gr
 import requests
+from budget_router.reward import grade_episode
 
 try:
     from openai import OpenAI
@@ -260,53 +261,22 @@ def get_policy_runner(policy_name: str) -> Tuple[Optional[Policy], Optional[str]
 # ─── Grade Computation ────────────────────────────────────────────────────────
 
 def compute_grade(history: List[Dict]) -> Dict[str, float]:
-    """Local mirror of reward.py grade_episode — no environment import needed."""
-    empty = {k: 0.0 for k in ["success_score", "latency_score", "budget_score",
-                                "sla_score", "adaptation_score", "overall_score"]}
-    if not history:
-        return empty
-
-    routing = [h for h in history if h.get("action") != "shed_load"]
-    success_score = (
-        sum(1 for h in routing if h.get("succeeded", False)) / len(routing)
-        if routing else 0.0
-    )
-
-    sla_ceiling = float(history[0].get("sla_ceiling_ms", 500.0) or 500.0)
-    latencies = [h.get("latency_ms", 0.0) for h in routing]
-    avg_lat = sum(latencies) / len(latencies) if latencies else 0.0
-    latency_score = max(0.0, 1.0 - avg_lat / sla_ceiling)
-    sla_score = (
-        sum(1 for lat in latencies if lat <= sla_ceiling) / len(latencies)
-        if latencies else 1.0
-    )
-
-    total_cost = sum(h.get("cost", 0.0) for h in history)
-    initial_budget = float(history[0].get("initial_budget", 1.0) or 1.0)
-    budget_score = max(0.0, 1.0 - total_cost / initial_budget)
-
-    degrade_start = int(history[0].get("degradation_start_step", 999) or 999)
-    if degrade_start < 999:
-        post = [h for h in routing if int(h.get("step", 0)) > max(degrade_start, 1)]
-        adaptation_score = (
-            sum(1 for h in post if h.get("succeeded", False)) / len(post)
-            if post else 0.0
-        )
-    else:
-        adaptation_score = 1.0
-
-    overall = max(0.0, min(1.0,
-        0.30 * success_score + 0.20 * latency_score +
-        0.15 * budget_score + 0.15 * sla_score + 0.20 * adaptation_score
-    ))
-    return {
-        "success_score": round(success_score, 4),
-        "latency_score": round(latency_score, 4),
-        "budget_score": round(budget_score, 4),
-        "sla_score": round(sla_score, 4),
-        "adaptation_score": round(adaptation_score, 4),
-        "overall_score": round(overall, 4),
-    }
+    canonical_history = [
+        {
+            "step": h.get("step", 0),
+            "action_type": h.get("action", "shed_load"),
+            "request_succeeded": h.get("succeeded", False),
+            "cost": h.get("cost", 0.0),
+            "latency_ms": h.get("latency_ms", 0.0),
+            "reward": h.get("reward", 0.0),
+            "sla_ceiling_ms": h.get("sla_ceiling_ms", 500.0),
+            "initial_budget": h.get("initial_budget", 1.0),
+            "degradation_start_step": h.get("degradation_start_step", 999),
+            "secondary_degradation_start_step": h.get("secondary_degradation_start_step"),
+        }
+        for h in history
+    ]
+    return grade_episode(canonical_history)
 
 # ─── HTML Renderers ───────────────────────────────────────────────────────────
 
@@ -444,6 +414,7 @@ def record_step(step: int, action: str, obs: Dict, reward: float, meta: Dict) ->
         "sla_ceiling_ms": meta.get("sla_ceiling_ms", 500.0),
         "initial_budget": meta.get("initial_budget", 1.0),
         "degradation_start_step": meta.get("degradation_start_step", 999),
+        "secondary_degradation_start_step": meta.get("secondary_degradation_start_step"),
     }
 
 _ACTION_COLORS = {
