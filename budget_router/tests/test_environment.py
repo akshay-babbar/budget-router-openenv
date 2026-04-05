@@ -331,3 +331,117 @@ class TestDegeneratePolicySanity:
         assert baseline_mean > shed_mean, (
             f"always_shed ({shed_mean:.2f}) >= baseline ({baseline_mean:.2f}) on easy"
         )
+
+
+# ─── Grader Semantic Tests ──────────────────────────────────────────────
+
+
+class TestGraderSemantics:
+    """Pin the exact grader semantics changed by the abstention and hard_multi fixes.
+
+    These tests defend against regressions to grade_episode() — the most
+    judge-sensitive function in the repo.
+    """
+
+    def _make_step(self, step, action, succeeded, cost, latency, degrade=999, secondary=None):
+        return {
+            "step": step, "action_type": action,
+            "request_succeeded": succeeded, "cost": cost,
+            "latency_ms": latency, "reward": 0.9,
+            "sla_ceiling_ms": 500.0, "initial_budget": 1.0,
+            "degradation_start_step": degrade,
+            "secondary_degradation_start_step": secondary,
+        }
+
+    def test_pure_abstention_scores_below_0_40_on_easy(self):
+        """A policy that sheds all load must score < 0.40 overall on easy.
+
+        Before the fix this scored ~0.70 (sla=1.0, latency=1.0 on empty routing set).
+        """
+        from budget_router.reward import grade_episode
+
+        history = [
+            self._make_step(i, "shed_load", False, 0.0, 0.0, degrade=999)
+            for i in range(1, 21)
+        ]
+        result = grade_episode(history)
+
+        assert result["overall_score"] < 0.40, (
+            f"Pure abstention scored {result['overall_score']} >= 0.40 on easy "
+            f"(grader exploit not fixed)"
+        )
+        assert result["sla_score"] == 0.0, "sla_score should be 0.0 when no requests routed"
+        assert result["latency_score"] == 0.0, "latency_score should be 0.0 when no requests routed"
+        assert result["success_score"] == 0.0, "success_score should be 0.0 when no requests routed"
+        assert result["budget_score"] == 1.0, "budget_score should be 1.0 when nothing spent"
+        assert result["adaptation_score"] == 1.0, "adaptation_score should be 1.0 on easy (no degradation)"
+
+    def test_partial_abstention_scores_less_than_full_service(self):
+        """A policy that sheds 50% of load must score < a policy that serves all 20 steps.
+
+        Before the success_score denominator fix, partial abstention could outscore
+        full service because budget_score rewarded not spending.
+        """
+        from budget_router.reward import grade_episode
+
+        # Mixed: 10 sheds then 10 successful routes
+        mixed = (
+            [self._make_step(i, "shed_load", False, 0.0, 0.0) for i in range(1, 11)]
+            + [self._make_step(i, "route_to_a", True, 0.01, 110.0) for i in range(11, 21)]
+        )
+        # Full service: 20 successful routes
+        full = [self._make_step(i, "route_to_a", True, 0.01, 110.0) for i in range(1, 21)]
+
+        r_mixed = grade_episode(mixed)
+        r_full = grade_episode(full)
+
+        assert r_mixed["overall_score"] < r_full["overall_score"], (
+            f"Partial abstention ({r_mixed['overall_score']}) >= full service "
+            f"({r_full['overall_score']}) — grader still rewards low-throughput"
+        )
+        assert r_mixed["success_score"] < r_full["success_score"], (
+            f"success_score should be lower for 10/20 served ({r_mixed['success_score']}) "
+            f"than 20/20 served ({r_full['success_score']})"
+        )
+
+    def test_hard_multi_adaptation_uses_secondary_window(self):
+        """grade_episode computes blended adaptation for hard_multi (secondary window included).
+
+        Verifies that secondary_degradation_start_step=10 in step_info causes
+        grade_episode to split the adaptation window at step 10 and blend 0.5/0.5.
+        """
+        from budget_router.reward import grade_episode
+
+        # Build a hard_multi episode: steps 1-10 primary window (route A, succeeds),
+        # steps 11-20 secondary window (route A, fails — B degraded, agent stuck)
+        history = []
+        for i in range(1, 11):
+            history.append(self._make_step(i, "route_to_a", True, 0.01, 110.0, degrade=0, secondary=10))
+        for i in range(11, 21):
+            history.append(self._make_step(i, "route_to_a", False, 0.01, 700.0, degrade=0, secondary=10))
+
+        result = grade_episode(history)
+
+        # primary_window: steps > max(0,1)=1 and <= 10 → steps 2..10 → 9 steps, all succeed → 1.0
+        # secondary_window: steps > 10 → steps 11..20 → 10 steps, all fail → 0.0
+        # blended = 0.5 * 1.0 + 0.5 * 0.0 = 0.5
+        expected_adaptation = 0.5
+        assert abs(result["adaptation_score"] - expected_adaptation) < 0.01, (
+            f"hard_multi blended adaptation expected ~{expected_adaptation}, "
+            f"got {result['adaptation_score']}"
+        )
+
+        # Compare with an equivalent hard (non-multi) episode to confirm they diverge
+        history_hard = []
+        for i in range(1, 11):
+            history_hard.append(self._make_step(i, "route_to_a", True, 0.01, 110.0, degrade=0, secondary=None))
+        for i in range(11, 21):
+            history_hard.append(self._make_step(i, "route_to_a", False, 0.01, 700.0, degrade=0, secondary=None))
+
+        result_hard = grade_episode(history_hard)
+        # hard (no secondary): post_degrade = steps > max(0,1)=1 → steps 2..20 → 19 steps
+        # 9 succeed (steps 2-10), 10 fail (steps 11-20) → 9/19 ≈ 0.473
+        assert result["adaptation_score"] != result_hard["adaptation_score"], (
+            f"hard_multi and hard got identical adaptation_score={result['adaptation_score']} "
+            f"— secondary window not being used"
+        )

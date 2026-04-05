@@ -135,7 +135,8 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
             + 0.20 × adaptation_score
 
     Component definitions:
-        success_score: Fraction of routed (non-shed) requests that succeeded.
+        success_score: Fraction of ALL episode steps with a successful routed request.
+            Denominator = total steps (not routed steps), so partial abstention is penalised.
         latency_score: 1.0 - (avg_latency / sla_ceiling), clamped to [0, 1].
         budget_score:  Fraction of initial budget NOT spent, clamped to [0, 1].
         sla_score:     Fraction of routed requests with latency <= sla_ceiling.
@@ -175,7 +176,13 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     metrics = episode_metrics(history)
 
-    success_score = float(metrics.get("success_rate", 0.0))
+    # success_score: fraction of ALL episode steps that resulted in a successful routed request.
+    # Denominator is total steps, not routed steps, so partial abstention is penalised.
+    # A policy that serves 10/20 and succeeds each time scores 0.50, not 1.0.
+    total_steps = len(history)
+    routing_steps = [h for h in history if h.get("action_type") != "shed_load"]
+    routed_successes = sum(1 for h in routing_steps if h.get("request_succeeded", False))
+    success_score = routed_successes / total_steps if total_steps > 0 else 0.0
 
     sla_ceiling_ms = float(history[0].get("sla_ceiling_ms", 500.0) or 500.0)
     avg_latency_ms = float(metrics.get("average_latency_ms", 0.0))
@@ -183,7 +190,6 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
     if sla_ceiling_ms <= 0:
         sla_ceiling_ms = 1.0
 
-    routing_steps = [h for h in history if h.get("action_type") != "shed_load"]
 
     # Fix 1: No routing attempts = no service delivered. Quality scores must reflect this.
     if routing_steps:
