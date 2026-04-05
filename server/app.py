@@ -22,17 +22,7 @@ app = create_web_interface_app(
 )
 
 if gr is not None and build_app is not None and os.getenv("ENABLE_GRADIO_DASHBOARD", "true").lower() in {"true", "1", "yes"}:
-    app = gr.mount_gradio_app(app, build_app(), path="/dashboard")
-
-
-
-@app.get("/", include_in_schema=False)
-def root() -> dict[str, str]:
-    web_path = "/web" if os.getenv("ENABLE_WEB_INTERFACE", "false").lower() in {"true", "1", "yes"} else "/docs"
-    payload = {"status": "ok", "web": web_path, "health": "/health"}
-    if gr is not None and build_app is not None and os.getenv("ENABLE_GRADIO_DASHBOARD", "true").lower() in {"true", "1", "yes"}:
-        payload["dashboard"] = "/dashboard"
-    return payload
+    app = gr.mount_gradio_app(app, build_app(), path="/")
 
 
 def main(host: str = "0.0.0.0", port: int | None = None) -> None:
