@@ -23,7 +23,7 @@ else:
     app = create_fastapi_app(env, Action, Observation)
 
 if gr is not None and build_app is not None and os.getenv("ENABLE_GRADIO_DASHBOARD", "true").lower() in {"true", "1", "yes"}:
-    app = gr.mount_gradio_app(app, build_app(), path="/")
+    app = gr.mount_gradio_app(app, build_app(), path="/web")
 
 
 def main(host: str = "0.0.0.0", port: int | None = None) -> None:
