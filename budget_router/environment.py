@@ -195,6 +195,7 @@ class BudgetRouterEnv(Environment):
             "sla_ceiling_ms": self._config.sla_ceiling_ms,
             "initial_budget": self._internal.initial_budget_dollars,
             "degradation_start_step": self._config.degradation_start_step,
+            "secondary_degradation_start_step": self._config.secondary_degradation_start_step if self._config.secondary_degradation_target else None,
         }
 
         if action_type == "shed_load":
