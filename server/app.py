@@ -2,7 +2,7 @@ import os
 
 import uvicorn
 
-from openenv_core.env_server.web_interface import create_web_interface_app
+from openenv_core.env_server import create_app, create_fastapi_app
 
 from budget_router.environment import BudgetRouterEnv
 from budget_router.models import Action, Observation
@@ -15,11 +15,12 @@ except ImportError:
     gr = None
     build_app = None
 
-app = create_web_interface_app(
-    BudgetRouterEnv(emit_structured_logs=True),
-    Action,
-    Observation
-)
+env = BudgetRouterEnv(emit_structured_logs=True)
+
+if os.getenv("ENABLE_OPENENV_WEB_INTERFACE", "false").lower() in {"true", "1", "yes"}:
+    app = create_app(env, Action, Observation)
+else:
+    app = create_fastapi_app(env, Action, Observation)
 
 if gr is not None and build_app is not None and os.getenv("ENABLE_GRADIO_DASHBOARD", "true").lower() in {"true", "1", "yes"}:
     app = gr.mount_gradio_app(app, build_app(), path="/")
