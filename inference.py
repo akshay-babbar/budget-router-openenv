@@ -48,7 +48,7 @@ COST PRINCIPLES (reason from these, not a fixed lookup):
 - A provider is "healthy" when its status > 0.52. Below that, routing there risks failure.
 - shed_load is a last resort only when routing is impossible: every provider has status ≤ 0.52, OR budget cannot absorb even the cheapest available healthy provider. If any provider is healthy and affordable, shed_load is always the wrong choice.
 - When budget_remaining < 0.10, avoid route_to_c entirely regardless of its health.
-- Provider status changes over time — a degraded provider may recover later.
+- Provider degradation is permanent within an episode: once a provider's status begins falling, it will not recover. Treat any provider with declining status as a permanent reliability risk for the remainder of the episode.
 
 REASONING APPROACH:
 1. Is any provider healthy (status > 0.52)?
