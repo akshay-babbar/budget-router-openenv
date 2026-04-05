@@ -15,10 +15,10 @@ except ImportError:
     gr = None
     build_app = None
 
-app = create_app(
+app = create_web_interface_app(
     BudgetRouterEnv(emit_structured_logs=True),
     Action,
-    Observation,
+    Observation
 )
 
 if gr is not None and build_app is not None and os.getenv("ENABLE_GRADIO_DASHBOARD", "true").lower() in {"true", "1", "yes"}:
