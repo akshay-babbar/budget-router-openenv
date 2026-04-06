@@ -24,7 +24,8 @@ def _parse_llm_action(response_text: str) -> str:
     return "shed_load"  # safe fallback: always valid, never crashes
 
 
-SYSTEM_PROMPT = """You are a cost-aware LLM API routing agent managing a production system.
+SYSTEM_PROMPT = """/no_think
+You are a cost-aware LLM API routing agent managing a production system.
 At each step, output EXACTLY ONE action string. Nothing else.
 
 PROVIDERS AND COSTS:
@@ -104,8 +105,8 @@ class LLMRouter:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user",   "content": user_prompt},
                 ],
-                max_tokens=20,
-                temperature=0.0,
+                max_tokens=30,
+                temperature=0.7,
             )
             raw = response.choices[0].message.content or ""
             action_str = _parse_llm_action(raw)

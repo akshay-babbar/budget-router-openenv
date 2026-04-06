@@ -4,27 +4,20 @@ Run: python app_gradio.py  (launches on http://localhost:7860)
 """
 from __future__ import annotations
 
-import os
 import time
 from typing import Any, Dict, List, Optional, Tuple, Protocol
 
 import gradio as gr
 import requests
+from budget_router.models import Observation
 from budget_router.reward import grade_episode
-
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+from inference import select_policy
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 BASE_URL = "http://localhost:8000"
 AUTO_PLAY_DELAY = 0.5
 MAX_STEPS = 20
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
 
 SCENARIOS = ["easy", "medium", "hard", "hard_multi"]
 ACTION_CHOICES = [
@@ -33,7 +26,6 @@ ACTION_CHOICES = [
     ("🔴 route_to_c ($0.10)", "route_to_c"),
     ("⚪ shed_load (-0.5)", "shed_load"),
 ]
-VALID_ACTIONS = [choice[1] for choice in ACTION_CHOICES]
 
 # Minimal CSS overrides - theme handles most styling via _dark variants
 LIGHT_CSS = """
@@ -175,86 +167,38 @@ class Policy(Protocol):
         ...
 
 
-class HeuristicPolicy:
-    threshold = 0.52
+class PolicyRunnerAdapter:
+    def __init__(self, policy_name: str, policy_impl: object) -> None:
+        self._policy_name = policy_name
+        self._policy_impl = policy_impl
 
     def choose_action(self, obs: Dict) -> str:
-        providers = [
-            ("route_to_a", obs.get("provider_a_status", 0)),
-            ("route_to_b", obs.get("provider_b_status", 0)),
-            ("route_to_c", obs.get("provider_c_status", 0)),
-        ]
-        candidates = providers[:2] if obs.get("budget_remaining", 1) < 0.10 else providers
-        for action, status in candidates:
-            if status > self.threshold:
-                return action
-        return "shed_load"
+        observation = _obs_to_observation(obs)
+        if self._policy_name == "heuristic":
+            action = self._policy_impl(observation)
+        else:
+            action = self._policy_impl.choose_action(observation)
+        return action.action_type.value
 
 
-class LLMPolicy:
-    """Thin adapter around an OpenAI-compatible chat completion endpoint."""
-
-    SYSTEM_PROMPT = """You are an incident-response routing agent controlling a
-production service. At each step you observe provider health metrics and must
-choose exactly one action.
-
-Valid actions — respond with ONLY one of these four strings, nothing else:
-  route_to_a
-  route_to_b
-  route_to_c
-  shed_load
-
-Decision rules:
-- Prefer providers with windowed success rate above 0.52 and lower cost.
-- If budget_remaining is below 0.20, prefer cheaper providers or shed_load.
-- shed_load reduces backlog but costs -0.5 reward — use it when all providers
-  are degraded, not as a default.
-- Never respond with anything other than one of the four action strings above."""
-
-    @staticmethod
-    def _parse_action(response_text: str) -> str:
-        text = response_text.strip().lower()
-        for action in VALID_ACTIONS:
-            if action in text:
-                return action
-        return "shed_load"
-
-    def __init__(self, api_base_url: str, model_name: str, api_key: str) -> None:
-        if OpenAI is None:
-            raise RuntimeError("openai package is not installed. Run `pip install openai`.")
-        self._client = OpenAI(base_url=api_base_url, api_key=api_key)
-        self._model_name = model_name
-
-    def choose_action(self, obs: Dict) -> str:
-        obs_text = "\n".join([
-            f"provider_a_status: {obs.get('provider_a_status', 0):.3f}",
-            f"provider_b_status: {obs.get('provider_b_status', 0):.3f}",
-            f"provider_c_status: {obs.get('provider_c_status', 0):.3f}",
-            f"budget_remaining:  {obs.get('budget_remaining', 0):.3f}",
-            f"queue_backlog:     {obs.get('queue_backlog', 0):.3f}",
-            f"system_latency:    {obs.get('system_latency', 0):.3f}",
-            f"step_count:        {obs.get('step_count', 0):.3f}",
-        ])
-        response = self._client.chat.completions.create(
-            model=self._model_name,
-            messages=[
-                {"role": "system", "content": self.SYSTEM_PROMPT},
-                {"role": "user", "content": f"Current observation:\n{obs_text}\n\nYour action:"},
-            ],
-            max_tokens=20,
-            temperature=0.0,
-        )
-        raw = response.choices[0].message.content or ""
-        return self._parse_action(raw)
+def _obs_to_observation(obs: Dict) -> Observation:
+    return Observation(
+        provider_a_status=float(obs.get("provider_a_status", 0.0) or 0.0),
+        provider_b_status=float(obs.get("provider_b_status", 0.0) or 0.0),
+        provider_c_status=float(obs.get("provider_c_status", 0.0) or 0.0),
+        budget_remaining=float(obs.get("budget_remaining", 0.0) or 0.0),
+        queue_backlog=float(obs.get("queue_backlog", 0.0) or 0.0),
+        system_latency=float(obs.get("system_latency", 0.0) or 0.0),
+        step_count=float(obs.get("step_count", 0.0) or 0.0),
+        done=bool(obs.get("done", False)),
+        reward=float(obs.get("reward", 0.0) or 0.0),
+        metadata=obs.get("metadata", {}) or {},
+    )
 
 
 def get_policy_runner(policy_name: str) -> Tuple[Optional[Policy], Optional[str]]:
-    if policy_name == "heuristic":
-        return HeuristicPolicy(), None
-    if not HF_TOKEN:
-        return None, "HF_TOKEN is required for LLM simulation."
     try:
-        return LLMPolicy(api_base_url=API_BASE_URL, model_name=MODEL_NAME, api_key=HF_TOKEN), None
+        return PolicyRunnerAdapter(policy_name, select_policy(policy_name)), None
     except Exception as exc:
         return None, str(exc)
 
