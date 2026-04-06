@@ -24,7 +24,7 @@ def _parse_llm_action(response_text: str) -> str:
     return "shed_load"  # safe fallback: always valid, never crashes
 
 
-SYSTEM_PROMPT = """/no_think
+SYSTEM_PROMPT = """
 You are a cost-aware LLM API routing agent managing a production system.
 At each step, output EXACTLY ONE action string. Nothing else.
 
@@ -57,7 +57,8 @@ REASONING APPROACH:
 3. If no: shed_load.
 4. Always protect budget_remaining — it is the binding constraint.
 
-Output only the action string."""
+Output only the action string.
+You will receive observations sequentially across steps. Use the full conversation history to detect trends: if a provider's status has dropped across consecutive observations, treat it as actively degrading and switch proactively. If a provider's status is declining and the budget is insufficient to route to the most reliable remaining provider for all remaining steps, prefer the cheapest viable provider now to preserve budget optionality."""
 
 app = typer.Typer(add_completion=False)
 
@@ -82,9 +83,16 @@ class LLMRouter:
     def __init__(self, api_base_url: str, model_name: str, api_key: str) -> None:
         self._client = OpenAI(base_url=api_base_url, api_key=api_key)
         self._model_name = model_name
+        self._messages: List[Dict[str, str]] = []
+        self.reset()
+
+    def reset(self) -> None:
+        self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     def choose_action(self, observation: Observation) -> Action:
         obs = observation
+        if not self._messages or obs.step_count == 0.0:
+            self.reset()
         obs_text = "\n".join([
             f"provider_a_status: {obs.provider_a_status:.3f}",
             f"provider_b_status: {obs.provider_b_status:.3f}",
@@ -98,15 +106,13 @@ class LLMRouter:
 
         client = self._client
         model_name = self._model_name
+        self._messages.append({"role": "user", "content": user_prompt})
         try:
             response = client.chat.completions.create(
                 model=model_name,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user",   "content": user_prompt},
-                ],
+                messages=self._messages,
                 max_tokens=30,
-                temperature=0.7,
+                temperature=0,
             )
             raw = response.choices[0].message.content or ""
             action_str = _parse_llm_action(raw)
@@ -114,6 +120,7 @@ class LLMRouter:
             import sys
             print(f"[llm_error] step API_ERROR: {e}", file=sys.stdout, flush=True)
             action_str = "shed_load"
+        self._messages.append({"role": "assistant", "content": action_str})
         return Action(action_type=ActionType(action_str))
 
 
@@ -190,6 +197,9 @@ def run_episode(
 ) -> Dict[str, Any]:
     total_reward = 0.0
     grader_score: float | None = None
+
+    if policy_name == "llm":
+        policy.reset()
 
     log_start(task=scenario.name, seed=seed, episode=episode)
 
