@@ -4,3 +4,5 @@ README_archived.md
 *.json
 docs/
 *.txt
+trained_models/
+train/

@@ -29,12 +29,12 @@ Our baseline implementation uses a standard health-threshold heuristic. The LLM 
 
 **Provenance**: numbers below are development-seed runs (seeds 0–9), current grader version.
 
-| Scenario | Heuristic Mean Reward | Success Rate | Mean Latency (ms) | Heuristic Grader | LLM Grader | PPO Agent (50–100k steps) |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Easy** | 7.88 | 85.0% | 163.9 | 0.7958 | 0.7958 | 0.7497 |
-| **Medium** | 3.72 | 80.5% | 188.7 | 0.7071 | 0.7071 | — |
-| **Hard** | 0.01 | 81.4% | 188.2 | 0.6778 | 0.7091 | — |
-| **Hard_Multi** | -2.38 | 72.8% | 243.2 | 0.6094 | 0.7157 | **0.6911** (+13.4%) |
+| Scenario | Heuristic Mean Reward | Success Rate | Mean Latency (ms) | Heuristic Grader | LLM Grader | PPO-MLP (100k) | PPO-Transformer (200k) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Easy** | 7.88 | 85.0% | 163.9 | 0.7958 | 0.7958 | 0.7497 | — |
+| **Medium** | 3.72 | 80.5% | 188.7 | 0.7071 | 0.7071 | — | — |
+| **Hard** | 0.01 | 81.4% | 188.2 | 0.6778 | 0.7091 | — | — |
+| **Hard_Multi** | -2.38 | 72.8% | 243.2 | 0.6094 | 0.7157 | **0.6911** (+13.4%) | 0.6274 (+2.9%) |
 
 The stronger structural signal in this repo is that **Hard_Multi** separates privileged upper bound, heuristic, and random baselines rather than collapsing them—the task is strictly harder than **Hard** and is designed to expose policies that fail to anticipate the secondary cascade.
 
