@@ -466,6 +466,7 @@ def build_app() -> gr.Blocks:
             with gr.Column(scale=1, min_width=240):
                 gr.Markdown("### Controls")
                 scenario_sel = gr.Radio(SCENARIOS, value="easy", label="Scenario")
+                gr.Markdown("*Select scenario above before running auto-play*")
                 seed_inp     = gr.Number(value=42, label="Seed", precision=0)
                 start_btn    = gr.Button("▶ Start Episode", variant="primary")
 
@@ -473,7 +474,7 @@ def build_app() -> gr.Blocks:
                 action_sel = gr.Radio(ACTION_CHOICES, value="route_to_a", label="Select Action")
                 step_btn   = gr.Button("→ Take Step", variant="secondary")
                 auto_btn   = gr.Button("⚡ Run Heuristic Auto-Play")
-                llm_btn    = gr.Button("🤖 Run LLM Simulation... Not implemented yet")
+                llm_btn    = gr.Button("🤖 Run LLM Auto-Play")
 
                 status_box = gr.Textbox(label="Status", interactive=False, lines=2)
 
