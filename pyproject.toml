@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Incident Commander for Budgeted Tool/API Reliability — OpenEnv RL Environment"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "Apache 2.0"
+license = { text = "Apache-2.0" }
 authors = [
     { name = "Akshay Babbar" },
 ]
