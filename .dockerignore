@@ -14,3 +14,11 @@ docs/*.png
 .hf_private/
 .DS_Store
 artifacts/
+
+.hackathon_context/
+README_archived.md
+llm_stderr.log
+pre_validation.sh
+test_docker_step.sh
+trained_models/
+train/

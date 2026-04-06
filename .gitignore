@@ -19,3 +19,10 @@ docs/
 *.json
 *.tar.gz
 *.txt
+README_archived.md
+llm_stderr.log
+pre_validation.sh
+test_docker_step.sh
+.hackathon_context/
+trained_models/
+train/
