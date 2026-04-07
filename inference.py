@@ -28,37 +28,37 @@ SYSTEM_PROMPT = """
 You are a cost-aware LLM API routing agent managing a production system.
 At each step, output EXACTLY ONE action string. Nothing else.
 
-PROVIDERS AND COSTS:
-  provider_a_status: health of Provider A — costs $0.01/request (CHEAPEST)
-  provider_b_status: health of Provider B — costs $0.05/request
-  provider_c_status: health of Provider C — costs $0.10/request (10x cost of A)
-  budget_remaining: fraction of budget left [0=exhausted → -10 penalty, 1=full]
-  queue_backlog: pending requests (higher = more urgent to route)
-  system_latency: current latency pressure
-  step_count: episode progress [0=start, 1=end]
+ENVIRONMENT:
+  Three providers: A ($0.01/req, cheapest), B ($0.05/req), C ($0.10/req, most reliable).
+  provider_X_status = windowed success rate [0=always fails, 1=always succeeds].
+  budget_remaining: fraction of budget left. Reaching 0 = catastrophic -10 penalty.
+  step_count [0→1], steps_remaining: episode progress (20 steps total).
 
 VALID ACTIONS (output ONLY one):
-  route_to_a
-  route_to_b
-  route_to_c
-  shed_load
+  route_to_a | route_to_b | route_to_c | shed_load
 
-COST PRINCIPLES (reason from these, not a fixed lookup):
-- Budget exhaustion (budget_remaining → 0) triggers a -10 penalty that wipes all reward.
-  Protect budget: route_to_a when healthy, it costs 1/10th of route_to_c.
-- A provider is "healthy" when its status > 0.52. Below that, routing there risks failure.
-- shed_load is a last resort only when routing is impossible: every provider has status ≤ 0.52, OR budget cannot absorb even the cheapest available healthy provider. If any provider is healthy and affordable, shed_load is always the wrong choice.
-- When budget_remaining < 0.10, avoid route_to_c entirely regardless of its health.
-- Provider degradation is permanent within an episode: once a provider's status begins falling, it will not recover. Treat any provider with declining status as a permanent reliability risk for the remainder of the episode.
+GOLDEN RULE — DEFAULT STRATEGY:
+  Stay on the CHEAPEST provider whose status > 0.52. Only deviate if there is CLEAR, SUSTAINED evidence of degradation (defined below). Unnecessary switching to expensive providers burns budget and reduces your score.
 
-REASONING APPROACH:
-1. Is any provider healthy (status > 0.52)?
-2. If yes: pick the cheapest healthy provider that fits the budget.
-3. If no: shed_load.
-4. Always protect budget_remaining — it is the binding constraint.
+NOISE CALIBRATION (critical):
+  - Status fluctuates ±0.10-0.20 per step due to random sampling. This is NORMAL.
+  - Each prompt shows trend_X = average per-step change over the last 2 steps.
+  - NOISE zone: |trend_X| < 0.07 — treat the provider as STABLE. Do NOT switch.
+  - REAL degradation signal: trend_X < -0.07 AND current status < 0.72.
+    Only when BOTH conditions hold across 2+ consecutive steps should you consider switching early.
+  - On stable tasks (no true degradation), all trends will hover near 0.0 due to noise.
+    Do NOT switch away from cheap providers based on noisy trends alone.
 
-Output only the action string.
-You will receive observations sequentially across steps. Use the full conversation history to detect trends: if a provider's status has dropped across consecutive observations, treat it as actively degrading and switch proactively. If a provider's status is declining and the budget is insufficient to route to the most reliable remaining provider for all remaining steps, prefer the cheapest viable provider now to preserve budget optionality."""
+WHEN TO SWITCH (use your conversation history):
+  A → B: Only when trend_a < -0.07 AND status_a < 0.72, OR status_a already < 0.52.
+  B → C: Only when trend_b < -0.07 AND status_b < 0.75, OR status_b already < 0.52.
+  Never switch based on a single bad observation — Bernoulli noise causes occasional dips.
+
+BUDGET RUNWAY:
+  If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
+  Never exhaust budget — the -10 penalty wipes all accumulated reward.
+
+Output only the action string."""
 
 app = typer.Typer(add_completion=False)
 
@@ -94,16 +94,52 @@ class LLMRouter:
         self._model_name = model_name
         self._messages: List[Dict[str, str]] = []
         self.last_error: str | None = None
+        self._prev_obs: dict | None = None
+        self._prev2_obs: dict | None = None
+        self._task_name: str = ""
         self.reset()
 
-    def reset(self) -> None:
+    def reset(self, task_name: str = "") -> None:
         self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         self.last_error = None
+        self._prev_obs = None
+        self._prev2_obs = None
+        self._task_name = task_name
 
     def choose_action(self, observation: Observation) -> Action:
         obs = observation
         if not self._messages or obs.step_count == 0.0:
             self.reset()
+
+        # ── Compute 2-step trend (more noise-robust than single-step delta) ──
+        trend_text = ""
+        budget_runway_text = ""
+
+        if self._prev2_obs is not None:
+            # Average per-step change over 2 steps — variance is ~30% lower than 1-step delta
+            ta = (obs.provider_a_status - self._prev2_obs["a"]) / 2.0
+            tb = (obs.provider_b_status - self._prev2_obs["b"]) / 2.0
+            tc = (obs.provider_c_status - self._prev2_obs["c"]) / 2.0
+            trend_text = f"\ntrend (avg/step, 2-step):  A:{ta:+.3f}  B:{tb:+.3f}  C:{tc:+.3f}"
+        elif self._prev_obs is not None:
+            # First step — single-step delta only, label as less reliable
+            ta = obs.provider_a_status - self._prev_obs["a"]
+            tb = obs.provider_b_status - self._prev_obs["b"]
+            tc = obs.provider_c_status - self._prev_obs["c"]
+            trend_text = f"\ntrend (1-step only, noisy): A:{ta:+.3f}  B:{tb:+.3f}  C:{tc:+.3f}"
+
+        if self._prev_obs is not None:
+            budget_spent = self._prev_obs["budget"] - obs.budget_remaining
+            if budget_spent > 0.001:
+                runway = int(obs.budget_remaining / budget_spent)
+                budget_runway_text = f"\nbudget_runway_at_current_rate: ~{runway} steps"
+            else:
+                budget_runway_text = "\nbudget_runway_at_current_rate: >20 steps"
+
+        steps_total = 20
+        steps_remaining = max(1, steps_total - int(round(obs.step_count * steps_total)))
+
+        task_line = f"\ntask: {self._task_name}" if self._task_name else ""
         obs_text = "\n".join([
             f"provider_a_status: {obs.provider_a_status:.3f}",
             f"provider_b_status: {obs.provider_b_status:.3f}",
@@ -112,8 +148,19 @@ class LLMRouter:
             f"queue_backlog:     {obs.queue_backlog:.3f}",
             f"system_latency:    {obs.system_latency:.3f}",
             f"step_count:        {obs.step_count:.3f}",
+            f"steps_remaining:   {steps_remaining}",
         ])
+        obs_text += trend_text + budget_runway_text + task_line
         user_prompt = f"Current observation:\n{obs_text}\n\nYour action:"
+
+        # Shift history: prev becomes prev2, current becomes prev
+        self._prev2_obs = self._prev_obs
+        self._prev_obs = {
+            "a": obs.provider_a_status,
+            "b": obs.provider_b_status,
+            "c": obs.provider_c_status,
+            "budget": obs.budget_remaining,
+        }
 
         client = self._client
         model_name = self._model_name
@@ -208,7 +255,7 @@ def run_episode(
     success = False
 
     if policy_name == "llm":
-        policy.reset()
+        policy.reset(task_name=scenario.name)
 
     log_start(task=scenario.name, env=BENCHMARK_NAME, model=MODEL_NAME)
 
