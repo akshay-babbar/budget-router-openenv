@@ -141,6 +141,10 @@ def _observation_payload(observation: Observation) -> Dict[str, float]:
     }
 
 
+def _reported_score(value: float) -> float:
+    return min(max(float(value), 0.001), 0.999)
+
+
 def log_start(task: str, seed: int, episode: int) -> None:
     _emit_log("[START]", {"task": task, "seed": seed, "episode": episode})
 
@@ -166,7 +170,7 @@ def log_end(task: str, seed: int, episode: int, total_reward: float, grade: floa
             "seed": seed,
             "episode": episode,
             "total_reward": float(total_reward),
-            "grade": float(grade),
+            "score": _reported_score(grade),
         },
     )
 
