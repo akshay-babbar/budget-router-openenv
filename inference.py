@@ -66,8 +66,8 @@ API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
-LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or "15")
-LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES") or "1")
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or "10")
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES") or "0")
 BENCHMARK_NAME = os.getenv("BENCHMARK_NAME") or "budget_router"
 
 SEED_SETS: Dict[str, List[int]] = {
@@ -267,7 +267,7 @@ def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
 def main(
     policy: Literal["heuristic", "llm"] = typer.Option("llm" if API_KEY and API_BASE_URL else "heuristic"),
     seed_set: Literal["development", "heldout"] = typer.Option("development"),
-    scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("hard_multi"),
+    scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("all"),
     max_seeds: int = typer.Option(1),
     output_path: Path = typer.Option(Path("baseline_results.json")),
 ) -> None:
