@@ -27,10 +27,14 @@ from .models import (
     ProviderState,
     TaskConfig,
 )
-from .reward import step_reward
+from .reward import grade_episode, step_reward
 from .tasks import EASY
 
 BACKLOG_LATENCY_PER_ITEM_MS = 8.0
+
+
+def _reported_score(value: float) -> float:
+    return min(max(float(value), 0.001), 0.999)
 
 
 class BudgetRouterEnv(Environment):
@@ -281,7 +285,7 @@ class BudgetRouterEnv(Environment):
                         "seed": int(self._current_seed) if self._current_seed is not None else -1,
                         "episode": self._episode_number,
                         "total_reward": round(float(self._cumulative_reward), 4),
-                        "grade": 0.0,
+                        "score": _reported_score(float(grade_episode(self._internal.history)["overall_score"])),
                     },
                 )
                 return obs
@@ -390,7 +394,7 @@ class BudgetRouterEnv(Environment):
                     "seed": int(self._current_seed) if self._current_seed is not None else -1,
                     "episode": self._episode_number,
                     "total_reward": round(float(self._cumulative_reward), 4),
-                    "grade": 0.0,
+                    "score": _reported_score(float(grade_episode(self._internal.history)["overall_score"])),
                 },
             )
 
