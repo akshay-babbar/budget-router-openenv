@@ -15,6 +15,11 @@ docs/*.png
 .DS_Store
 artifacts/
 *.zip
+*.json
+**/*.json
+*.txt
+**/*.txt
+outputs/
 
 .hackathon_context/
 README_archived.md

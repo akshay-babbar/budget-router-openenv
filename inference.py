@@ -62,9 +62,9 @@ You will receive observations sequentially across steps. Use the full conversati
 
 app = typer.Typer(add_completion=False)
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN")
+API_BASE_URL = os.getenv("API_BASE_URL")
+MODEL_NAME = os.getenv("MODEL_NAME")
+API_KEY = os.getenv("API_KEY")
 
 SEED_SETS: Dict[str, List[int]] = {
     "development": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
