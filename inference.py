@@ -66,6 +66,9 @@ API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or "10")
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES") or "0")
+BENCHMARK_NAME = os.getenv("BENCHMARK_NAME") or "budget_router"
 
 SEED_SETS: Dict[str, List[int]] = {
     "development": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -82,13 +85,20 @@ VALID_ACTIONS = [action.value for action in ActionType]
 
 class LLMRouter:
     def __init__(self, api_base_url: str, model_name: str, api_key: str) -> None:
-        self._client = OpenAI(base_url=api_base_url, api_key=api_key)
+        self._client = OpenAI(
+            base_url=api_base_url,
+            api_key=api_key,
+            timeout=LLM_TIMEOUT_SECONDS,
+            max_retries=LLM_MAX_RETRIES,
+        )
         self._model_name = model_name
         self._messages: List[Dict[str, str]] = []
+        self.last_error: str | None = None
         self.reset()
 
     def reset(self) -> None:
         self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        self.last_error = None
 
     def choose_action(self, observation: Observation) -> Action:
         obs = observation
@@ -109,7 +119,7 @@ class LLMRouter:
         model_name = self._model_name
         self._messages.append({"role": "user", "content": user_prompt})
         try:
-            response = client.chat.completions.create(
+            response = client.with_options(timeout=LLM_TIMEOUT_SECONDS).chat.completions.create(
                 model=model_name,
                 messages=self._messages,
                 max_tokens=30,
@@ -117,16 +127,18 @@ class LLMRouter:
             )
             raw = response.choices[0].message.content or ""
             action_str = _parse_llm_action(raw)
+            self.last_error = None
         except Exception as e:
-            import sys
-            print(f"[llm_error] step API_ERROR: {e}", file=sys.stdout, flush=True)
+            self.last_error = str(e)
             action_str = "shed_load"
         self._messages.append({"role": "assistant", "content": action_str})
         return Action(action_type=ActionType(action_str))
 
 
-def _emit_log(prefix: str, payload: Dict[str, Any]) -> None:
-    print(f"{prefix} {json.dumps(payload)}", flush=True)
+def _single_line(value: str | None) -> str:
+    if not value:
+        return "null"
+    return str(value).replace("\n", " ").replace("\r", " ")
 
 
 def _observation_payload(observation: Observation) -> Dict[str, float]:
@@ -145,33 +157,22 @@ def _reported_score(value: float) -> float:
     return min(max(float(value), 0.001), 0.999)
 
 
-def log_start(task: str, seed: int, episode: int) -> None:
-    _emit_log("[START]", {"task": task, "seed": seed, "episode": episode})
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
-def log_step(step: int, action: str, reward: float, done: bool, observation: Observation) -> None:
-    _emit_log(
-        "[STEP]",
-        {
-            "step": step,
-            "action": action,
-            "reward": float(reward),
-            "done": bool(done),
-            "observation": _observation_payload(observation),
-        },
+def log_step(step: int, action: str, reward: float, done: bool, error: str | None) -> None:
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={_single_line(error)}",
+        flush=True,
     )
 
 
-def log_end(task: str, seed: int, episode: int, total_reward: float, grade: float) -> None:
-    _emit_log(
-        "[END]",
-        {
-            "task": task,
-            "seed": seed,
-            "episode": episode,
-            "total_reward": float(total_reward),
-            "score": _reported_score(grade),
-        },
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={_reported_score(score):.3f} rewards={rewards_str}",
+        flush=True,
     )
 
 
@@ -202,11 +203,14 @@ def run_episode(
 ) -> Dict[str, Any]:
     total_reward = 0.0
     grader_score: float | None = None
+    rewards: List[float] = []
+    steps_taken = 0
+    success = False
 
     if policy_name == "llm":
         policy.reset()
 
-    log_start(task=scenario.name, seed=seed, episode=episode)
+    log_start(task=scenario.name, env=BENCHMARK_NAME, model=MODEL_NAME)
 
     try:
         observation = env.reset(seed=seed, scenario=scenario)
@@ -216,12 +220,15 @@ def run_episode(
             observation = env.step(action)
             reward = float(observation.reward or 0.0)
             total_reward += reward
+            rewards.append(reward)
+            steps_taken = env._internal.current_step
+            step_error = getattr(policy, "last_error", None) if policy_name == "llm" else None
             log_step(
                 step=env._internal.current_step,
                 action=action_name,
                 reward=reward,
                 done=bool(observation.done),
-                observation=observation,
+                error=step_error,
             )
 
         metrics = episode_metrics(env._internal.history)
@@ -231,19 +238,18 @@ def run_episode(
         metrics["episode_length"] = env._internal.current_step
         grader = grade_episode(env._internal.history)
         grader_score = float(grader["overall_score"])
+        success = grader_score > 0.0
         metrics["grader_score"] = grader_score
         metrics["grader_breakdown"] = grader
         return metrics
     finally:
+        close_fn = getattr(env, "close", None)
+        if callable(close_fn):
+            close_fn()
         if grader_score is None:
             grader_score = float(grade_episode(env._internal.history)["overall_score"])
-        log_end(
-            task=scenario.name,
-            seed=seed,
-            episode=episode,
-            total_reward=round(total_reward, 4),
-            grade=grader_score,
-        )
+            success = grader_score > 0.0
+        log_end(success=success, steps=steps_taken, score=grader_score, rewards=rewards)
 
 
 def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
@@ -261,17 +267,19 @@ def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
 def main(
     policy: Literal["heuristic", "llm"] = typer.Option("llm" if API_KEY and API_BASE_URL else "heuristic"),
     seed_set: Literal["development", "heldout"] = typer.Option("development"),
-    scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("all"),
+    scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("hard_multi"),
+    max_seeds: int = typer.Option(1),
     output_path: Path = typer.Option(Path("baseline_results.json")),
 ) -> None:
     selected_policy = select_policy(policy)
     selected_tasks = TASKS if scenario == "all" else {scenario: TASKS[scenario]}
+    selected_seeds = SEED_SETS[seed_set][: max(1, max_seeds)]
     results: Dict[str, Dict[str, object]] = {}
     episode = 1
 
     for task_name, task_config in selected_tasks.items():
         task_metrics = []
-        for seed in SEED_SETS[seed_set]:
+        for seed in selected_seeds:
             env = BudgetRouterEnv()
             task_metrics.append(
                 run_episode(
