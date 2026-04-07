@@ -64,7 +64,7 @@ app = typer.Typer(add_completion=False)
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = os.getenv("API_KEY") or os.getenv("HF_TOKEN")
 
 SEED_SETS: Dict[str, List[int]] = {
     "development": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -174,11 +174,11 @@ def select_policy(policy_name: Literal["heuristic", "llm"]) -> object:
     if policy_name == "heuristic":
         return heuristic_baseline_policy
 
-    if not HF_TOKEN:
+    if not API_KEY:
         raise RuntimeError(
-            "LLM policy requires HF_TOKEN and reads API_BASE_URL and MODEL_NAME from environment variables."
+            "LLM policy requires API_KEY and reads API_BASE_URL and MODEL_NAME from environment variables."
         )
-    return LLMRouter(api_base_url=API_BASE_URL, model_name=MODEL_NAME, api_key=HF_TOKEN)
+    return LLMRouter(api_base_url=API_BASE_URL, model_name=MODEL_NAME, api_key=API_KEY)
 
 
 def choose_action(policy_name: Literal["heuristic", "llm"], policy: object, observation: Observation) -> Action:

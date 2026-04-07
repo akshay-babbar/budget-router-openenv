@@ -14,6 +14,7 @@ docs/*.png
 .hf_private/
 .DS_Store
 artifacts/
+*.zip
 
 .hackathon_context/
 README_archived.md
