@@ -175,9 +175,9 @@ def select_policy(policy_name: Literal["heuristic", "llm"]) -> object:
     if policy_name == "heuristic":
         return heuristic_baseline_policy
 
-    if not API_KEY:
+    if not API_KEY or not API_BASE_URL:
         raise RuntimeError(
-            "LLM policy requires API_KEY and reads API_BASE_URL and MODEL_NAME from environment variables."
+            "LLM policy requires API_BASE_URL and API_KEY and reads MODEL_NAME from environment variables."
         )
     return LLMRouter(api_base_url=API_BASE_URL, model_name=MODEL_NAME, api_key=API_KEY)
 
@@ -255,7 +255,7 @@ def summarize(metrics: Iterable[Dict[str, float]]) -> Dict[str, float]:
 
 @app.command()
 def main(
-    policy: Literal["heuristic", "llm"] = typer.Option("heuristic"),
+    policy: Literal["heuristic", "llm"] = typer.Option("llm" if API_KEY and API_BASE_URL else "heuristic"),
     seed_set: Literal["development", "heldout"] = typer.Option("development"),
     scenario: Literal["all", "easy", "medium", "hard", "hard_multi"] = typer.Option("all"),
     output_path: Path = typer.Option(Path("baseline_results.json")),
