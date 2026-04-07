@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [
     { name = "Akshay Babbar" },
+    { name = "Harshit Babbar" },
 ]
 dependencies = [
     "fastapi>=0.110,<1.0",
