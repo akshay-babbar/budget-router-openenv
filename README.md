@@ -91,7 +91,7 @@ To reproduce the 10-seed evaluation locally:
 
 ```bash
 # Install dependencies
-uv sync
+uv sync --extra training
 
 # Run evaluation (writes to outputs/ppo_hard_multi_eval.json)
 uv run python train/eval_hard_multi.py
