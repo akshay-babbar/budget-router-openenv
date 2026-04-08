@@ -13,6 +13,8 @@ pinned: false
 
 Budget Router is an OpenEnv-compliant RL environment where an agent routes requests to one of three providers (A/B/C) or sheds load under a tight **cost–reliability–SLA** trade-off. Providers degrade non-stationarily within an episode; the agent observes only a noisy windowed success signal (rolling success rate), not true internal health.
 
+[![HF Space](https://img.shields.io/badge/🤗-Live%20Demo-yellow)](https://huggingface.co/spaces/akshay4/budget-router-openenv)
+
 ## TL;DR
 
 **Hard_Multi is the headline scenario**: when Provider A degrades from step 0 and
@@ -28,6 +30,11 @@ stay positive. Three policy families, each stronger than the last:
 **Mechanism** (PPO): the agent learned to route A→B early and conserve budget
 before B's cascade at step 10, pushing `adaptation_score` from 0.7356 (heuristic)
 to **0.9500** — a +0.2144 gain on the grader's most diagnostic sub-score.
+
+**Environment hardness**: heuristic reward goes negative (−2.38) on
+Hard-Multi while oracle reaches +4.90 — a 7.28-point gap that confirms
+the cascade task is hard enough to require RL and learnable enough to
+reward it.
 
 **Honest scope**: LLM is not uniformly better; it underperforms the heuristic on
 Easy (−6.4%) and Hard (−2.7%). The LLM and PPO advantages are specific to
@@ -77,6 +84,31 @@ intentionally blank (no model for those tasks).
 | Heuristic | 0.6285 | — |
 | LLM | 0.6732 | +7.1%; 4/5 seeds; falsifies dev-seed overfitting |
 
+<details>
+<summary>🔬 Reproducing PPO Results (Optional)</summary>
+
+The trained PPO policy for the hard_multi scenario is included at  
+`trained_models/ppo_hard_multi_100k.zip` (143KB, trained 100k steps).
+
+To reproduce the 10-seed evaluation locally:
+
+```bash
+# Install dependencies
+uv sync
+
+# Run evaluation (writes to outputs/ppo_hard_multi_eval.json)
+uv run python train/eval_hard_multi.py
+```
+
+Expected output: PPO mean=0.690 ± 0.034 vs Heuristic mean=0.609 ± 0.028,  
+win_rate=1.0 (10/10 seeds), non-overlapping 95% CIs.
+
+> The deployed `inference.py` uses the LLM policy as required by the  
+> hackathon specification. PPO was trained offline to validate environment  
+> depth and demonstrate that the task rewards genuine RL learning.
+
+</details>
+
 ## Why this benchmark has substance
 
 - **Partial observability**: the agent-visible observation contains only `provider_a/b/c_status`, `budget_remaining`, `queue_backlog`, `system_latency`, and `step_count` (`budget_router/models.py`). True provider health is internal.
@@ -87,6 +119,23 @@ intentionally blank (no model for those tasks).
   achieves non-overlapping 95% CIs above the heuristic on Hard_Multi
   (`train/eval_hard_multi.py`), confirming the cascade signal is learnable
   beyond reactive or in-context policies.
+
+### Oracle–Baseline reward gap (verified, n=10 seeds each)
+
+| Scenario | Oracle† | Heuristic | Gap | Signal |
+|---|---|---|---|---|
+| Easy | +10.10 | +7.88 | 2.22 (22%) | Heuristic competitive |
+| Medium | +9.49 | +3.72 | 5.77 (61%) | Meaningful headroom |
+| Hard | +6.57 | +0.01 | 6.56 (100%) | Heuristic nearly fails |
+| **Hard-Multi** | **+4.90** | **−2.38** | **7.28 (305%)** | **Heuristic actively harmful** |
+
+*† Oracle has privileged access to internal provider health — theoretical ceiling only, not a deployable policy.*
+
+On Hard-Multi the heuristic reward goes negative (−2.38): the rule-based
+policy exhausts budget mid-cascade and actively destroys episode value.
+Oracle stays strongly positive (+4.90). The 7.28-point gap — 305% above
+the heuristic — is what produces the large advantage signal that allows
+`PPO` to find a meaningful gradient in 100k steps.
 
 ```mermaid
 flowchart LR

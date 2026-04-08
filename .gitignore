@@ -24,5 +24,4 @@ llm_stderr.log
 pre_validation.sh
 test_docker_step.sh
 .hackathon_context/
-trained_models/
 outputs/*/

@@ -196,11 +196,21 @@ def _obs_to_observation(obs: Dict) -> Observation:
     )
 
 
+def _format_policy_error(policy_name: str, error: str) -> str:
+    if policy_name == "llm" and "API_BASE_URL" in error and "API_KEY" in error:
+        return (
+            "LLM auto-play is not enabled in this hosted Space. "
+            "To try it, duplicate this Space to your own account and set "
+            "API_BASE_URL, API_KEY, and optionally MODEL_NAME in that copy's Space settings."
+        )
+    return error
+
+
 def get_policy_runner(policy_name: str) -> Tuple[Optional[Policy], Optional[str]]:
     try:
         return PolicyRunnerAdapter(policy_name, select_policy(policy_name)), None
     except Exception as exc:
-        return None, str(exc)
+        return None, _format_policy_error(policy_name, str(exc))
 
 # ─── Grade Computation ────────────────────────────────────────────────────────
 

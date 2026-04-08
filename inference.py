@@ -73,8 +73,8 @@ API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
 
 API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
-LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or "10")
-LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES") or "0")
+LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or "25")
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES") or "1")
 BENCHMARK_NAME = os.getenv("BENCHMARK_NAME") or "budget_router"
 
 SEED_SETS: Dict[str, List[int]] = {
