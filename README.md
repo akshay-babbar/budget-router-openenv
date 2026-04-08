@@ -47,6 +47,14 @@ uv run server
 
 Then open `http://127.0.0.1:8000/web` for the Gradio dashboard.
 
+Optional (enable LLM policy locally):
+
+```bash
+export API_BASE_URL="https://<openai-compatible-endpoint>/v1"  # e.g. https://router.huggingface.co/v1
+export API_KEY="<your_key>"
+export MODEL_NAME="<model_id>"  # optional (e.g. Qwen/Qwen2.5-72B-Instruct)
+```
+
 ## Benchmark results
 
 Three policies evaluated:
