@@ -217,5 +217,3 @@ eval/eval_all.sh --tasks hard_multi --seeds 5 --seed-set heldout --policies heur
 ## References
 
 - Altman (1999): Constrained Markov Decision Processes
-- Cheung et al. (2020): Dynamic Regret
-- Birkbeck et al. (2024): CHIRPs
