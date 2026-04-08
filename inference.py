@@ -56,7 +56,7 @@ B → C: Same principle — sustained decline signals, not single-step noise.
 Never switch based on a single bad observation — noise causes occasional dips.
 
 BUDGET RUNWAY:
-  If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
+If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
 TASK PROFILES (the task name appears in each observation — use it):
   easy:       Stable environment. Trend fluctuations are mostly noise. Stay on the cheapest provider unless its trend is catastrophically and sustainedly negative.
   medium:     Dynamic environment. A provider may degrade mid-episode. Monitor trends and switch to the next cheapest healthy fallback if the primary fails.
