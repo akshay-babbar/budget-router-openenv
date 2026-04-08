@@ -217,7 +217,5 @@ eval/eval_all.sh --tasks hard_multi --seeds 5 --seed-set heldout --policies heur
 ## References
 
 - Altman (1999): Constrained Markov Decision Processes
-- Achiam et al. (2017): Constrained Policy Optimization
-- Paternain et al. (2019): Safe and Risk-Averse RL (zero duality gap)
 - Cheung et al. (2020): Dynamic Regret
 - Birkbeck et al. (2024): CHIRPs
