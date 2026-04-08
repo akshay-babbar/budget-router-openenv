@@ -5,6 +5,4 @@ README_archived.md
 docs/
 *.txt
 *.zip
-outputs/
 trained_models/
-train/

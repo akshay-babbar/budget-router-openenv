@@ -19,7 +19,6 @@ artifacts/
 **/*.json
 *.txt
 **/*.txt
-outputs/
 
 .hackathon_context/
 README_archived.md
@@ -27,4 +26,3 @@ llm_stderr.log
 pre_validation.sh
 test_docker_step.sh
 trained_models/
-train/
