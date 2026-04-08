@@ -56,7 +56,13 @@ WHEN TO SWITCH (use your conversation history):
 
 BUDGET RUNWAY:
   If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
-  Never exhaust budget — the -10 penalty wipes all accumulated reward.
+TASK PROFILES (the task name appears in each observation — use it):
+  easy:       Stable environment. Trend fluctuations are mostly noise. Stay on the cheapest provider unless its trend is catastrophically and sustainedly negative.
+  medium:     Dynamic environment. A provider may degrade mid-episode. Monitor trends and switch to the next cheapest healthy fallback if the primary fails.
+  hard / hard_multi: Hostile, multi-failure environments. Multiple providers may degrade at unexpected times in unpredictable sequences.
+              Your Runbook: Always map traffic to the lowest-cost healthy provider (A=$0.01, B=$0.05, C=$0.10).
+              Watch your conversation history: if your currently active provider shows a clear, sustained negative trend, switch early to the next cheapest option that is healthy.
+              CRITICAL: Before switching to expensive fallbacks (like C), use budget_runway to verify you can afford them to prevent budget exhaustion.
 
 Output only the action string."""
 
