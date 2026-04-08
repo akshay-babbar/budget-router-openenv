@@ -310,7 +310,7 @@ def render_markdown_table(summary: Dict, policies: List[str], tasks: List[str]) 
             if k0 in summary and k1 in summary:
                 diff = summary[k1]["grader_mean"] - summary[k0]["grader_mean"]
                 if diff > 0:
-                    note = f"LLM +{diff*100:.1f}% vs heuristic"
+                    note = f"LLM +{diff*100:.1f} points vs heuristic"
         line = f"| {task_labels.get(task, task)} | {' | '.join(scores)} | {note} |"
         lines.append(line)
     return "\n".join(lines)
