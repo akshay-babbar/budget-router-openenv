@@ -36,7 +36,7 @@ Hard-Multi while oracle reaches +4.90 — a 7.28-point gap that confirms
 the cascade task is hard enough to require RL and learnable enough to
 reward it.
 
-**Honest scope**: LLM and PPO advantages are **task-selective by design**: on single-degradation scenarios (Easy, Medium, Hard), the heuristic's budget-aware rules are sufficient. On Hard_Multi's **sequential cascade, in-context reasoning and learned anticipation outperform reactive rules** — exactly where the environment was designed to create headroom. An agent that beats the heuristic everywhere would suggest the heuristic is weak, not that the RL is strong.
+**Honest scope**: LLM and PPO advantages are concentrated on Hard_Multi's cascade structure. On Easy and Hard, the heuristic outperforms the LLM (−6.4% and −2.7% respectively), where single-provider degradation is recoverable by reactive rules and cost-conservative routing. Medium shows marginal LLM improvement (+1.9%). The `hard_multi` task — **simultaneous A+B sequential cascade** — is precisely where **in-context reasoning and learned anticipation** create material, statistically significant headroom over reactive baselines
 
 ## Benchmark results (grounded)
 
