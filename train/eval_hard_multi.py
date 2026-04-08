@@ -22,6 +22,8 @@ import math
 import statistics
 import sys
 from pathlib import Path
+import json, datetime
+
 
 # Ensure project root is on sys.path when running as a script
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -172,6 +174,30 @@ def main() -> None:
     if ppo_mean > heu_mean:
         print("  README snippet (paste into benchmark table):")
         print(f"  Hard_Multi PPO row: {ppo_mean:.4f}  (Δ {sign}{delta_pct:.1f}% vs heuristic)")
+
+    # JSON-serializable summary including per-seed breakdowns
+    episodes = []
+    for seed, p_bd, h_bd in zip(EVAL_SEEDS, ppo_breakdowns, heuristic_breakdowns):
+        episodes.append({
+            "seed": seed,
+            "ppo": p_bd,
+            "heuristic": h_bd,
+        })
+
+    out = {
+        "timestamp": datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),
+        "ppo_mean": ppo_mean,
+        "ppo_std": ppo_std,
+        "ppo_ci": [ppo_lo, ppo_hi],
+        "heu_mean": heu_mean,
+        "heu_std": heu_std,
+        "heu_ci": [heu_lo, heu_hi],
+        "delta": delta,
+        "delta_pct": delta_pct,
+        "win_rate": win_rate,
+        "episodes": episodes,
+    }
+    Path("outputs/ppo_hard_multi_eval.json").write_text(json.dumps(out, indent=2))
 
 
 if __name__ == "__main__":

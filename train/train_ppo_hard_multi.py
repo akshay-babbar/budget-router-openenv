@@ -69,7 +69,6 @@ def main() -> None:
         learning_rate=3e-4,
         verbose=1,
         device=DEVICE,
-        tensorboard_log=LOG_PATH,
     )
 
     model.learn(
