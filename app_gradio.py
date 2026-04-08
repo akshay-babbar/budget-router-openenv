@@ -286,22 +286,13 @@ def render_budget(obs: Dict) -> str:
     return _bar(b, "Budget Remaining", _budget_color(b))
 
 def render_grader(grade: Dict) -> str:
-    components = [
-        ("Success Score",    grade["success_score"],    "#27ae60"),
-        ("Latency Score",    grade["latency_score"],    "#3498db"),
-        ("Budget Score",     grade["budget_score"],     "#f39c12"),
-        ("SLA Score",        grade["sla_score"],        "#9b59b6"),
-        ("Adaptation Score", grade["adaptation_score"], "#e74c3c"),
-    ]
-    bars = _join([_bar(v, l, c) for l, v, c in components])
     o = grade["overall_score"]
     color = "#27ae60" if o > 0.7 else "#f39c12" if o > 0.4 else "#e74c3c"
-    overall_block = (
+    return (
         f'<div style="text-align:center;font-size:28px;font-weight:bold;'
         f'color:{color};margin-top:12px;padding:8px;border-radius:8px;'
         f'background:rgba(0,0,0,0.04)">Overall Score: {o:.1%}</div>'
     )
-    return bars + overall_block
 
 def _GRADER_PENDING() -> str:
     return "<div style='color:#aaa;font-style:italic'>Shown when episode completes.</div>"
