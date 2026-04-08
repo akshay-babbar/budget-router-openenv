@@ -59,7 +59,8 @@ PPO was trained and evaluated on Hard_Multi only; Easy/Medium/Hard cells are
 intentionally blank (no model for those tasks).
 
 **Statistical evidence — Hard_Multi** (`outputs/ppo_hard_multi_eval.json`,
-`outputs/eval_results_20260408_103950.json`):
+`outputs/eval_results_20260408_103950.json`,
+`outputs/eval_ppo_hard_multi_20260408.txt` — per-seed trace):
 
 | | Heuristic | LLM | PPO |
 |---|---|---|---|

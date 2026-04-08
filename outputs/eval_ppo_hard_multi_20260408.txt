@@ -1,0 +1,44 @@
+[eval] Loading trained_models/ppo_hard_multi_100k.zip
+
+─── PPO agent (deterministic, Hard_Multi) ───
+  [PPO]  seed= 0  overall=0.6554  adapt=0.8889  budget=0.0909  success=0.6500
+  [PPO]  seed= 1  overall=0.6866  adapt=0.9444  budget=0.0909  success=0.7000
+  [PPO]  seed= 2  overall=0.7255  adapt=1.0000  budget=0.0909  success=0.7500
+  [PPO]  seed= 3  overall=0.6833  adapt=0.9444  budget=0.0909  success=0.7000
+  [PPO]  seed= 4  overall=0.7247  adapt=1.0000  budget=0.0909  success=0.7500
+  [PPO]  seed= 5  overall=0.6472  adapt=0.8889  budget=0.0909  success=0.6500
+  [PPO]  seed= 6  overall=0.7317  adapt=1.0000  budget=0.0909  success=0.7500
+  [PPO]  seed= 7  overall=0.6417  adapt=0.8889  budget=0.1364  success=0.6000
+  [PPO]  seed= 8  overall=0.6840  adapt=0.9444  budget=0.0909  success=0.7000
+  [PPO]  seed= 9  overall=0.7222  adapt=1.0000  budget=0.0909  success=0.7500
+
+─── Heuristic baseline (Hard_Multi) ───
+  [HEU]  seed= 0  overall=0.5987  adapt=0.8333  budget=0.0545  success=0.6000
+  [HEU]  seed= 1  overall=0.6235  adapt=0.7778  budget=0.0364  success=0.7000
+  [HEU]  seed= 2  overall=0.6609  adapt=0.7778  budget=0.0727  success=0.7500
+  [HEU]  seed= 3  overall=0.5782  adapt=0.6278  budget=0.1273  success=0.6500
+  [HEU]  seed= 4  overall=0.6139  adapt=0.6833  budget=0.0818  success=0.7000
+  [HEU]  seed= 5  overall=0.5898  adapt=0.9444  budget=0.0364  success=0.5000
+  [HEU]  seed= 6  overall=0.6526  adapt=0.7778  budget=0.0273  success=0.7500
+  [HEU]  seed= 7  overall=0.5994  adapt=0.6833  budget=0.1545  success=0.7000
+  [HEU]  seed= 8  overall=0.5893  adapt=0.6667  budget=0.1000  success=0.6500
+  [HEU]  seed= 9  overall=0.5881  adapt=0.5833  budget=0.3000  success=0.6000
+
+══════════════════════════════════════════════════════════
+  HARD_MULTI: PPO vs Heuristic — Statistical Report
+══════════════════════════════════════════════════════════
+
+  PPO  grader:  0.6902 ± 0.0345   95% CI [0.6656, 0.7149]
+  HEU  grader:  0.6094 ± 0.0282   95% CI [0.5893, 0.6296]
+  Delta:        +0.0808  (+13.3%)
+  Win rate:     100%  (10/10 seeds PPO wins)
+
+  ── Sub-score breakdown ──
+  Adaptation:   PPO=0.9500  HEU=0.7356  Δ=+0.2144
+  Budget:       PPO=0.0954  HEU=0.0991  Δ=-0.0036
+
+  VERDICT: ✅ STRONG: PPO 95% CI is entirely above heuristic 95% CI — non-overlapping.
+══════════════════════════════════════════════════════════
+
+  README snippet (paste into benchmark table):
+  Hard_Multi PPO row: 0.6902  (Δ +13.3% vs heuristic)
