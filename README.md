@@ -24,7 +24,7 @@ stay positive. Three policy families, each stronger than the last:
 | Policy | Hard_Multi grader | vs baseline |
 |---|---:|---|
 | Heuristic (reactive) | 0.6094 | — |
-| LLM — Qwen2.5-72B | 0.6646 | +9.1% (p=0.00008, 14/15 seeds) |
+| LLM — Qwen2.5-72B | 0.6646 | +9.1% (p=0.00008, 13/15 seeds across dev+heldout) |
 | PPO — SB3, 100k steps | **0.6902** | **+13.3%** (10/10 seeds, non-overlapping CIs) |
 
 **Mechanism** (PPO): the agent learned to route A→B early and conserve budget
