@@ -89,21 +89,22 @@ GOLDEN RULE — DEFAULT STRATEGY:
   Stay on the CHEAPEST provider whose status > 0.52. Only deviate if there is CLEAR, SUSTAINED evidence of degradation (defined below). Unnecessary switching to expensive providers burns budget and reduces your score.
 
 NOISE CALIBRATION (critical):
-  - Status fluctuates ±0.10-0.20 per step due to random sampling. This is NORMAL.
-  - Each prompt shows trend_X = average per-step change over the last 2 steps.
-  - NOISE zone: |trend_X| < 0.07 — treat the provider as STABLE. Do NOT switch.
-  - REAL degradation signal: trend_X < -0.07 AND current status < 0.72.
-    Only when BOTH conditions hold across 2+ consecutive steps should you consider switching early.
-  - On stable tasks (no true degradation), all trends will hover near 0.0 due to noise.
-    Do NOT switch away from cheap providers based on noisy trends alone.
+- Status fluctuates due to Bernoulli sampling noise. Single-step dips are not reliable signals.
+- Use the provided 2-step trend (avg/step): a sustained negative trend across multiple steps
+indicates real degradation; a trend near 0 means the provider is stable. Do NOT switch on noise.
+- REAL degradation signal: sustained negative trend AND current status is visibly declining.
+- Only when both conditions hold across consecutive observations should you consider early switching.
+- On stable tasks, trends hover near zero. Switching on noise burns budget without benefit.
+
 
 WHEN TO SWITCH (use your conversation history):
-  A → B: Only when trend_a < -0.07 AND status_a < 0.72, OR status_a already < 0.52.
-  B → C: Only when trend_b < -0.07 AND status_b < 0.75, OR status_b already < 0.52.
-  Never switch based on a single bad observation — Bernoulli noise causes occasional dips.
+A → B: When trend_a is clearly and consistently negative AND status_a is approaching unreliable,
+           OR status_a is already below 0.52 (failure probability exceeds success probability).
+B → C: Same principle — sustained decline signals, not single-step noise.
+Never switch based on a single bad observation — noise causes occasional dips.
 
 BUDGET RUNWAY:
-  If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
+If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
 TASK PROFILES (the task name appears in each observation — use it):
   easy:       Stable environment. Trend fluctuations are mostly noise. Stay on the cheapest provider unless its trend is catastrophically and sustainedly negative.
   medium:     Dynamic environment. A provider may degrade mid-episode. Monitor trends and switch to the next cheapest healthy fallback if the primary fails.
