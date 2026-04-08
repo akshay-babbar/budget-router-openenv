@@ -38,7 +38,16 @@ reward it.
 
 **Honest scope**: LLM and PPO advantages are concentrated on Hard_Multi's cascade structure. On Easy and Hard, the heuristic outperforms the LLM (−6.4% and −2.7% respectively), where single-provider degradation is recoverable by reactive rules and cost-conservative routing. Medium shows marginal LLM improvement (+1.9%). The `hard_multi` task — **simultaneous A+B sequential cascade** — is precisely where **in-context reasoning and learned anticipation** create material, statistically significant headroom over reactive baselines
 
-## Benchmark results (grounded)
+## Run locally
+
+```bash
+uv sync
+uv run server
+```
+
+Then open `http://127.0.0.1:8000/web` for the Gradio dashboard.
+
+## Benchmark results
 
 Three policies evaluated:
 
