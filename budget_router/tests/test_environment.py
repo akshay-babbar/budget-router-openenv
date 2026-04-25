@@ -20,7 +20,7 @@ from budget_router.policies import (
     random_policy,
 )
 from budget_router.reward import step_reward
-from budget_router.tasks import EASY, HARD, MEDIUM
+from budget_router.tasks import EASY, HARD, HARD_MULTI, MEDIUM
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────
@@ -333,6 +333,59 @@ class TestDegeneratePolicySanity:
         )
 
 
+class TestBehavioralGuards:
+    """Behavioral regression tests for the repo's core adaptation claims."""
+
+    def test_heuristic_outperforms_always_route_a_on_hard_dev_seeds(self):
+        """On HARD, reactive routing must beat the cheapest non-adaptive baseline."""
+        env = BudgetRouterEnv()
+        seeds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+        heuristic_rewards = []
+        always_a_rewards = []
+
+        for seed in seeds:
+            _, rewards, _, _ = run_full_episode(
+                env, heuristic_baseline_policy, seed=seed, scenario=HARD
+            )
+            heuristic_rewards.append(sum(r or 0 for r in rewards))
+
+            _, rewards, _, _ = run_full_episode(
+                env, always_route_a_policy, seed=seed, scenario=HARD
+            )
+            always_a_rewards.append(sum(r or 0 for r in rewards))
+
+        heuristic_mean = sum(heuristic_rewards) / len(heuristic_rewards)
+        always_a_mean = sum(always_a_rewards) / len(always_a_rewards)
+
+        assert heuristic_mean > always_a_mean, (
+            f"heuristic ({heuristic_mean:.2f}) must beat always_route_a "
+            f"({always_a_mean:.2f}) on hard dev seeds"
+        )
+
+    def test_heuristic_completes_hard_multi_without_budget_exhaustion(self):
+        """On HARD_MULTI dev seeds, the baseline should finish without budget bankruptcy."""
+        env = BudgetRouterEnv()
+        seeds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+        for seed in seeds:
+            _, _, done, steps = run_full_episode(
+                env, heuristic_baseline_policy, seed=seed, scenario=HARD_MULTI
+            )
+            exhausted = any(
+                step.get("budget_exhausted", False) for step in env._internal.history
+            )
+
+            assert done, f"heuristic did not terminate on hard_multi seed={seed}"
+            assert steps == HARD_MULTI.max_steps, (
+                f"heuristic ended after {steps} steps, expected {HARD_MULTI.max_steps} "
+                f"on hard_multi seed={seed}"
+            )
+            assert not exhausted, (
+                f"heuristic hit budget exhaustion on hard_multi seed={seed}"
+            )
+
+
 # ─── Grader Semantic Tests ──────────────────────────────────────────────
 
 
@@ -374,7 +427,9 @@ class TestGraderSemantics:
         assert result["latency_score"] == 0.0, "latency_score should be 0.0 when no requests routed"
         assert result["success_score"] == 0.0, "success_score should be 0.0 when no requests routed"
         assert result["budget_score"] == 1.0, "budget_score should be 1.0 when nothing spent"
-        assert result["adaptation_score"] == 1.0, "adaptation_score should be 1.0 on easy (no degradation)"
+        assert result["adaptation_score"] == 0.0, (
+            "adaptation_score should be 0.0 on easy when the policy only sheds load"
+        )
 
     def test_partial_abstention_scores_less_than_full_service(self):
         """A policy that sheds 50% of load must score < a policy that serves all 20 steps.

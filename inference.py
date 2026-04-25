@@ -31,6 +31,9 @@ At each step, output EXACTLY ONE action string. Nothing else.
 ENVIRONMENT:
   Three providers: A ($0.01/req, cheapest), B ($0.05/req), C ($0.10/req, most reliable).
   provider_X_status = windowed success rate [0=always fails, 1=always succeeds].
+    IMPORTANT: A status of exactly 0.500 means this provider has NEVER been routed to
+    in this episode — it is unobserved, not confirmed healthy. Route to it once to get
+    a real reading. Do not treat 0.500 as a health signal.
   budget_remaining: fraction of budget left. Reaching 0 = catastrophic -10 penalty.
   step_count [0→1], steps_remaining: episode progress (20 steps total).
 
@@ -55,8 +58,14 @@ A → B: When trend_a is clearly and consistently negative AND status_a is appro
 B → C: Same principle — sustained decline signals, not single-step noise.
 Never switch based on a single bad observation — noise causes occasional dips.
 
-BUDGET RUNWAY:
-If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
+BUDGET RUNWAY — HARD CONSTRAINT:
+budget_runway_at_current_rate shows how many more steps you can afford at current spend rate.
+If budget_runway_at_current_rate < steps_remaining: switch to a cheaper provider IMMEDIATELY.
+If budget_remaining < 0.15 (less than 15% left): treat C as OFF-LIMITS unless A and B are
+  both below 0.30 status. Prefer shed_load over routing C when budget is this low.
+NEVER route to any provider if doing so would leave budget_remaining below the cost of
+that provider times the steps_remaining. The -10 bankruptcy penalty destroys all episode
+value accumulated so far — budget survival is non-negotiable.
 TASK PROFILES (the task name appears in each observation — use it):
   easy:       Stable environment. Trend fluctuations are mostly noise. Stay on the cheapest provider unless its trend is catastrophically and sustainedly negative.
   medium:     Dynamic environment. A provider may degrade mid-episode. Monitor trends and switch to the next cheapest healthy fallback if the primary fails.
@@ -64,6 +73,58 @@ TASK PROFILES (the task name appears in each observation — use it):
               Your Runbook: Always map traffic to the lowest-cost healthy provider (A=$0.01, B=$0.05, C=$0.10).
               Watch your conversation history: if your currently active provider shows a clear, sustained negative trend, switch early to the next cheapest option that is healthy.
               CRITICAL: Before switching to expensive fallbacks (like C), use budget_runway to verify you can afford them to prevent budget exhaustion.
+
+Output only the action string."""
+
+OBJECTIVE_FEEDBACK_PROMPT = """
+You are a cost-aware LLM API routing agent managing a production system.
+At each step, output EXACTLY ONE action string. Nothing else.
+
+ENVIRONMENT:
+  Three providers: A ($0.01/req, cheapest), B ($0.05/req), C ($0.10/req, most reliable).
+  provider_X_status = windowed success rate [0=always fails, 1=always succeeds].
+    IMPORTANT: A status of exactly 0.500 means this provider has NEVER been routed to
+    in this episode — it is unobserved, not confirmed healthy. Route to it once to get
+    a real reading. Do not treat 0.500 as a health signal.
+  budget_remaining: fraction of budget left. Reaching 0 = catastrophic -10 penalty.
+  step_count [0→1], steps_remaining: episode progress (20 steps total).
+
+VALID ACTIONS (output ONLY one):
+  route_to_a | route_to_b | route_to_c | shed_load
+
+PRIMARY OBJECTIVE:
+  Maximize the full-episode score, not just the next step.
+  The score rewards:
+  - serving requests successfully
+  - keeping latency and SLA healthy
+  - preserving budget
+  - adapting when providers degrade
+
+DECISION PRINCIPLES:
+  1. Budget survival is mandatory. Avoid the -10 bankruptcy penalty.
+  2. Use the cheapest provider that still looks likely to keep the system healthy.
+  3. Use REAL FEEDBACK from the previous step when available:
+     - if the last routed action failed or produced a strongly negative reward, treat that as evidence
+     - if repeated failures occur on the current provider, switch earlier instead of waiting too long
+  4. Do not switch on a single noisy dip alone. Prefer consistent evidence:
+     declining status, repeated failures, worsening reward, or shrinking budget runway.
+  5. When expensive providers are needed for reliability, use them deliberately and only while affordable.
+
+NOISE CALIBRATION:
+- Status values are noisy because they come from limited recent outcomes.
+- A single bad observation is weak evidence.
+- Repeated bad outcomes or sustained negative trend are strong evidence.
+
+BUDGET RUNWAY:
+- budget_runway_at_current_rate estimates how many more steps are affordable at the current spend rate.
+- If budget_runway_at_current_rate < steps_remaining, current spending is too high.
+- If budget_remaining < 0.15, treat C as expensive emergency capacity, not a default choice.
+
+TASK PROFILES:
+  easy:       Stable environment. Prefer low cost unless strong evidence suggests otherwise.
+  medium:     A provider may degrade mid-episode. Detect and move to the next best affordable option.
+  hard:       Early degradation. React faster once repeated evidence appears.
+  hard_multi: Multiple degradations can happen in sequence. Avoid burning budget too early; preserve runway for the late phase.
 
 Output only the action string."""
 
@@ -75,6 +136,9 @@ API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
 MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
 LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS") or "25")
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES") or "1")
+LLM_LOG_RAW = (os.getenv("LLM_LOG_RAW") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+LLM_LOG_RAW_MAX_CHARS = int(os.getenv("LLM_LOG_RAW_MAX_CHARS") or "220")
+LLM_POLICY_MODE = (os.getenv("LLM_POLICY_MODE") or "baseline").strip().lower()
 BENCHMARK_NAME = os.getenv("BENCHMARK_NAME") or "budget_router"
 
 SEED_SETS: Dict[str, List[int]] = {
@@ -91,7 +155,13 @@ VALID_ACTIONS = [action.value for action in ActionType]
 
 
 class LLMRouter:
-    def __init__(self, api_base_url: str, model_name: str, api_key: str) -> None:
+    def __init__(
+        self,
+        api_base_url: str,
+        model_name: str,
+        api_key: str,
+        prompt_mode: str | None = None,
+    ) -> None:
         self._client = OpenAI(
             base_url=api_base_url,
             api_key=api_key,
@@ -99,24 +169,32 @@ class LLMRouter:
             max_retries=LLM_MAX_RETRIES,
         )
         self._model_name = model_name
+        self._prompt_mode = (prompt_mode or LLM_POLICY_MODE or "baseline").strip().lower()
         self._messages: List[Dict[str, str]] = []
         self.last_error: str | None = None
+        self.last_raw_output: str | None = None
+        self.last_parsed_action: str | None = None
         self._prev_obs: dict | None = None
         self._prev2_obs: dict | None = None
         self._task_name: str = ""
         self.reset()
 
     def reset(self, task_name: str = "") -> None:
-        self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        prompt = OBJECTIVE_FEEDBACK_PROMPT if self._prompt_mode == "objective_feedback" else SYSTEM_PROMPT
+        self._messages = [{"role": "system", "content": prompt}]
         self.last_error = None
+        self.last_raw_output = None
+        self.last_parsed_action = None
         self._prev_obs = None
         self._prev2_obs = None
         self._task_name = task_name
 
     def choose_action(self, observation: Observation) -> Action:
         obs = observation
-        if not self._messages or obs.step_count == 0.0:
-            self.reset()
+        if not self._messages:
+            self.reset(task_name=self._task_name)
+        elif obs.step_count == 0.0 and len(self._messages) > 1:
+            self.reset(task_name=self._task_name)
 
         # ── Compute 2-step trend (more noise-robust than single-step delta) ──
         trend_text = ""
@@ -158,6 +236,10 @@ class LLMRouter:
             f"steps_remaining:   {steps_remaining}",
         ])
         obs_text += trend_text + budget_runway_text + task_line
+        if self._prompt_mode == "objective_feedback":
+            feedback_lines = self._previous_step_feedback(observation=obs)
+            if feedback_lines:
+                obs_text += "\n" + feedback_lines
         user_prompt = f"Current observation:\n{obs_text}\n\nYour action:"
 
         # Shift history: prev becomes prev2, current becomes prev
@@ -181,18 +263,62 @@ class LLMRouter:
             )
             raw = response.choices[0].message.content or ""
             action_str = _parse_llm_action(raw)
+            self.last_raw_output = raw
+            self.last_parsed_action = action_str
             self.last_error = None
         except Exception as e:
             self.last_error = str(e)
             action_str = "shed_load"
+            self.last_raw_output = None
+            self.last_parsed_action = action_str
         self._messages.append({"role": "assistant", "content": action_str})
         return Action(action_type=ActionType(action_str))
+
+    def _previous_step_feedback(self, observation: Observation) -> str:
+        metadata = getattr(observation, "metadata", None) or {}
+        if not metadata:
+            return ""
+
+        previous_action = metadata.get("action_type")
+        if not previous_action:
+            return ""
+
+        reward = observation.reward
+        latency = metadata.get("latency_ms")
+        cost = metadata.get("cost")
+        succeeded = metadata.get("request_succeeded")
+        budget_exhausted = metadata.get("budget_exhausted", False)
+
+        feedback_parts = [
+            "previous_step_feedback:",
+            f"  previous_action: {previous_action}",
+        ]
+        if reward is not None:
+            feedback_parts.append(f"  previous_reward: {float(reward):+.2f}")
+        if succeeded is not None:
+            feedback_parts.append(f"  previous_success: {str(bool(succeeded)).lower()}")
+        if cost is not None:
+            feedback_parts.append(f"  previous_cost: {float(cost):.2f}")
+        if latency is not None:
+            feedback_parts.append(f"  previous_latency_ms: {float(latency):.2f}")
+        if budget_exhausted:
+            feedback_parts.append("  previous_budget_exhausted: true")
+        return "\n".join(feedback_parts)
 
 
 def _single_line(value: str | None) -> str:
     if not value:
         return "null"
     return str(value).replace("\n", " ").replace("\r", " ")
+
+
+def _truncate_and_sanitize(value: str | None, max_chars: int) -> str:
+    if not value:
+        return "null"
+    s = _single_line(value).strip()
+    if len(s) <= max_chars:
+        return s
+    return s[: max(0, max_chars - 3)] + "..."
 
 
 def _observation_payload(observation: Observation) -> Dict[str, float]:
@@ -215,11 +341,24 @@ def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
-def log_step(step: int, action: str, reward: float, done: bool, error: str | None) -> None:
-    print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={_single_line(error)}",
-        flush=True,
+def log_step(
+    step: int,
+    action: str,
+    reward: float,
+    done: bool,
+    error: str | None,
+    llm_raw: str | None = None,
+    llm_parsed: str | None = None,
+) -> None:
+    base = (
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} "
+        f"error={_single_line(error)}"
     )
+    if LLM_LOG_RAW:
+        raw_s = _truncate_and_sanitize(llm_raw, max_chars=max(20, LLM_LOG_RAW_MAX_CHARS))
+        parsed_s = _single_line(llm_parsed)
+        base += f" llm_raw={raw_s} llm_parsed={parsed_s}"
+    print(base, flush=True)
 
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
@@ -277,12 +416,16 @@ def run_episode(
             rewards.append(reward)
             steps_taken = env._internal.current_step
             step_error = getattr(policy, "last_error", None) if policy_name == "llm" else None
+            llm_raw = getattr(policy, "last_raw_output", None) if policy_name == "llm" else None
+            llm_parsed = getattr(policy, "last_parsed_action", None) if policy_name == "llm" else None
             log_step(
                 step=env._internal.current_step,
                 action=action_name,
                 reward=reward,
                 done=bool(observation.done),
                 error=step_error,
+                llm_raw=llm_raw,
+                llm_parsed=llm_parsed,
             )
 
         metrics = episode_metrics(env._internal.history)

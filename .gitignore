@@ -25,3 +25,5 @@ pre_validation.sh
 test_docker_step.sh
 .hackathon_context/
 outputs/*/
+.cursor/
+.docs/

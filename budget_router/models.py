@@ -125,6 +125,13 @@ class InternalState:
     provider_window: Dict[str, List[bool]] = field(default_factory=dict)
     window_size: int = 5
 
+    # Probed providers: tracks which providers have been routed to at least once
+    probed_providers: set = field(default_factory=set)
+
+    # Resolved (jittered) degradation onsets for this episode
+    actual_degradation_start: int = 0
+    actual_secondary_degradation_start: int = 999
+
     def get_windowed_success_rate(self, provider_name: str) -> float:
         """Get success rate over the last `window_size` requests for a provider."""
         window = self.provider_window.get(provider_name, [])
@@ -173,11 +180,13 @@ class TaskConfig:
     degradation_start_step: int = 0  # step at which degradation begins
     degradation_rate: float = 0.0  # health reduction per step for provider A
     degradation_target: str = "A"  # which provider degrades
+    degradation_start_jitter: int = 0  # ±jitter applied per episode to degradation_start_step
 
     # Secondary degradation (for multi-provider scenarios)
     secondary_degradation_start_step: int = 999  # 999 = no secondary degradation
     secondary_degradation_rate: float = 0.0
     secondary_degradation_target: str = ""  # empty = no secondary degradation
+    secondary_degradation_start_jitter: int = 0  # ±jitter applied per episode to secondary_degradation_start_step
 
     # Episode
     max_steps: int = 20

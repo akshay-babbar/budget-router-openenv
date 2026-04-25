@@ -46,11 +46,7 @@ from budget_router.policies import heuristic_baseline_policy
 from budget_router.reward import episode_metrics, grade_episode
 from budget_router.tasks import EASY, HARD, HARD_MULTI, MEDIUM
 
-try:
-    from openai import OpenAI
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
+from inference import LLMRouter
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
@@ -69,145 +65,27 @@ SEED_SETS: Dict[str, List[int]] = {
 API_KEY      = os.getenv("API_KEY") or os.getenv("HF_TOKEN")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
-
-_VALID_ACTIONS = ["route_to_a", "route_to_b", "route_to_c", "shed_load"]
-
-SYSTEM_PROMPT = """
-You are a cost-aware LLM API routing agent managing a production system.
-At each step, output EXACTLY ONE action string. Nothing else.
-
-ENVIRONMENT:
-  Three providers: A ($0.01/req, cheapest), B ($0.05/req), C ($0.10/req, most reliable).
-  provider_X_status = windowed success rate [0=always fails, 1=always succeeds].
-  budget_remaining: fraction of budget left. Reaching 0 = catastrophic -10 penalty.
-  step_count [0→1], steps_remaining: episode progress (20 steps total).
-
-VALID ACTIONS (output ONLY one):
-  route_to_a | route_to_b | route_to_c | shed_load
-
-GOLDEN RULE — DEFAULT STRATEGY:
-  Stay on the CHEAPEST provider whose status > 0.52. Only deviate if there is CLEAR, SUSTAINED evidence of degradation (defined below). Unnecessary switching to expensive providers burns budget and reduces your score.
-
-NOISE CALIBRATION (critical):
-- Status fluctuates due to Bernoulli sampling noise. Single-step dips are not reliable signals.
-- Use the provided 2-step trend (avg/step): a sustained negative trend across multiple steps
-indicates real degradation; a trend near 0 means the provider is stable. Do NOT switch on noise.
-- REAL degradation signal: sustained negative trend AND current status is visibly declining.
-- Only when both conditions hold across consecutive observations should you consider early switching.
-- On stable tasks, trends hover near zero. Switching on noise burns budget without benefit.
+LLM_LOG_RAW = (os.getenv("LLM_LOG_RAW") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+LLM_LOG_RAW_MAX_CHARS = int(os.getenv("LLM_LOG_RAW_MAX_CHARS") or "220")
 
 
-WHEN TO SWITCH (use your conversation history):
-A → B: When trend_a is clearly and consistently negative AND status_a is approaching unreliable,
-           OR status_a is already below 0.52 (failure probability exceeds success probability).
-B → C: Same principle — sustained decline signals, not single-step noise.
-Never switch based on a single bad observation — noise causes occasional dips.
+def _single_line(value: str | None) -> str:
+    if not value:
+        return "null"
+    return str(value).replace("\n", " ").replace("\r", " ")
 
-BUDGET RUNWAY:
-If budget_runway_at_current_rate < steps_remaining, switch to a cheaper provider immediately.
-TASK PROFILES (the task name appears in each observation — use it):
-  easy:       Stable environment. Trend fluctuations are mostly noise. Stay on the cheapest provider unless its trend is catastrophically and sustainedly negative.
-  medium:     Dynamic environment. A provider may degrade mid-episode. Monitor trends and switch to the next cheapest healthy fallback if the primary fails.
-  hard / hard_multi: Hostile, multi-failure environments. Multiple providers may degrade at unexpected times in unpredictable sequences.
-              Your Runbook: Always map traffic to the lowest-cost healthy provider (A=$0.01, B=$0.05, C=$0.10).
-              Watch your conversation history: if your currently active provider shows a clear, sustained negative trend, switch early to the next cheapest option that is healthy.
-              CRITICAL: Before switching to expensive fallbacks (like C), use budget_runway to verify you can afford them to prevent budget exhaustion.
 
-Output only the action string."""
+def _truncate(value: str | None, max_chars: int) -> str:
+    s = _single_line(value).strip()
+    if len(s) <= max_chars:
+        return s
+    return s[: max(0, max_chars - 3)] + "..."
 
 
 # ── Policies ────────────────────────────────────────────────────────────────
-
-def _parse_action(text: str) -> str:
-    text = text.strip().lower()
-    for a in _VALID_ACTIONS:
-        if a in text:
-            return a
-    return "shed_load"
-
-
-class LLMPolicy:
-    def __init__(self) -> None:
-        if not HAS_OPENAI:
-            raise RuntimeError("openai package not installed: pip install openai")
-        if not API_KEY:
-            raise RuntimeError("No API key found. Set HF_TOKEN or API_KEY env var.")
-        self._client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY, timeout=15.0, max_retries=0)
-        self._messages: List[Dict] = []
-        self.last_error: Optional[str] = None
-        self._prev_obs: Optional[dict] = None
-        self._prev2_obs: Optional[dict] = None
-        self._task_name: str = ""
-
-    def reset(self, task_name: str = "") -> None:
-        self._messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        self.last_error = None
-        self._prev_obs = None
-        self._prev2_obs = None
-        self._task_name = task_name
-
-    def choose_action(self, obs: Observation) -> str:
-        # ── Compute 2-step trend (more noise-robust than single-step delta) ──
-        trend_text = ""
-        budget_runway_text = ""
-
-        if self._prev2_obs is not None:
-            ta = (obs.provider_a_status - self._prev2_obs["a"]) / 2.0
-            tb = (obs.provider_b_status - self._prev2_obs["b"]) / 2.0
-            tc = (obs.provider_c_status - self._prev2_obs["c"]) / 2.0
-            trend_text = f"\ntrend (avg/step, 2-step):  A:{ta:+.3f}  B:{tb:+.3f}  C:{tc:+.3f}"
-        elif self._prev_obs is not None:
-            ta = obs.provider_a_status - self._prev_obs["a"]
-            tb = obs.provider_b_status - self._prev_obs["b"]
-            tc = obs.provider_c_status - self._prev_obs["c"]
-            trend_text = f"\ntrend (1-step only, noisy): A:{ta:+.3f}  B:{tb:+.3f}  C:{tc:+.3f}"
-
-        if self._prev_obs is not None:
-            budget_spent = self._prev_obs["budget"] - obs.budget_remaining
-            if budget_spent > 0.001:
-                runway = int(obs.budget_remaining / budget_spent)
-                budget_runway_text = f"\nbudget_runway_at_current_rate: ~{runway} steps"
-            else:
-                budget_runway_text = "\nbudget_runway_at_current_rate: >20 steps"
-
-        steps_total = 20
-        steps_remaining = max(1, steps_total - int(round(obs.step_count * steps_total)))
-        task_line = f"\ntask: {self._task_name}" if self._task_name else ""
-
-        obs_text = "\n".join([
-            f"provider_a_status: {obs.provider_a_status:.3f}",
-            f"provider_b_status: {obs.provider_b_status:.3f}",
-            f"provider_c_status: {obs.provider_c_status:.3f}",
-            f"budget_remaining:  {obs.budget_remaining:.3f}",
-            f"queue_backlog:     {obs.queue_backlog:.3f}",
-            f"system_latency:    {obs.system_latency:.3f}",
-            f"step_count:        {obs.step_count:.3f}",
-            f"steps_remaining:   {steps_remaining}",
-        ])
-        obs_text += trend_text + budget_runway_text + task_line
-
-        # Shift history: prev becomes prev2, current becomes prev
-        self._prev2_obs = self._prev_obs
-        self._prev_obs = {
-            "a": obs.provider_a_status,
-            "b": obs.provider_b_status,
-            "c": obs.provider_c_status,
-            "budget": obs.budget_remaining,
-        }
-
-        self._messages.append({"role": "user", "content": f"Observation:\n{obs_text}\n\nAction:"})
-        try:
-            resp = self._client.chat.completions.create(
-                model=MODEL_NAME, messages=self._messages, max_tokens=30, temperature=0
-            )
-            raw = resp.choices[0].message.content or ""
-            action = _parse_action(raw)
-            self.last_error = None
-        except Exception as e:
-            self.last_error = str(e)
-            action = "shed_load"
-        self._messages.append({"role": "assistant", "content": action})
-        return action
+def _llm_choose_action(policy: LLMRouter, obs: Observation) -> str:
+    action = policy.choose_action(obs)
+    return action.action_type.value
 
 
 def _heuristic(obs: Observation) -> str:
@@ -235,12 +113,20 @@ def run_one_episode(
         if policy_name == "heuristic":
             action_str = _heuristic(obs)
         else:
-            action_str = policy.choose_action(obs)
+            action_str = _llm_choose_action(policy, obs)
 
         obs = env.step(Action(action_type=ActionType(action_str)))
         reward = float(obs.reward or 0.0)
         rewards.append(reward)
         actions.append(action_str)
+        if policy_name == "llm" and LLM_LOG_RAW:
+            llm_raw = getattr(policy, "last_raw_output", None)
+            llm_parsed = getattr(policy, "last_parsed_action", None)
+            typer.echo(
+                f"[LLM] step={env._internal.current_step} action={action_str} "
+                f"reward={reward:+.2f} llm_raw={_truncate(llm_raw, max(20, LLM_LOG_RAW_MAX_CHARS))} "
+                f"llm_parsed={_single_line(llm_parsed)}"
+            )
 
     grader = grade_episode(env._internal.history)
     metrics = episode_metrics(env._internal.history)
@@ -347,7 +233,11 @@ def main(
             policy_instances["heuristic"] = None  # uses _heuristic() directly
         elif p == "llm":
             try:
-                policy_instances["llm"] = LLMPolicy()
+                if not API_KEY:
+                    raise RuntimeError("No API key found. Set HF_TOKEN or API_KEY env var.")
+                policy_instances["llm"] = LLMRouter(
+                    api_base_url=API_BASE_URL, model_name=MODEL_NAME, api_key=API_KEY
+                )
                 typer.echo(f"LLM policy: {MODEL_NAME} via {API_BASE_URL}")
             except RuntimeError as e:
                 typer.echo(f"[WARN] LLM policy unavailable: {e} — skipping", err=True)

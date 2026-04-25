@@ -246,8 +246,13 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
                 post_successes = sum(1 for h in post_degrade if h.get("request_succeeded", False))
                 adaptation_score = post_successes / len(post_degrade)
     else:
-        # No degradation event: adaptation not required, award full marks.
-        adaptation_score = 1.0
+        # No degradation event. Award adaptation based on routing quality instead.
+        # A do-nothing (always shed_load) policy gets 0, not 1.0.
+        if routing_steps:
+            quality_successes = sum(1 for h in routing_steps if h.get("request_succeeded", False))
+            adaptation_score = quality_successes / total_steps  # total_steps denominator penalizes abstention
+        else:
+            adaptation_score = 0.0
 
     overall = (
         0.3 * success_score
@@ -256,6 +261,14 @@ def grade_episode(history: List[Dict[str, Any]]) -> Dict[str, Any]:
         + 0.15 * sla_score
         + 0.2 * adaptation_score
     )
+
+    # Hard penalty for budget exhaustion: incomplete episodes are not reliable systems.
+    # A policy that routes aggressively and goes bankrupt at step 17 should not outscore
+    # one that completes all 20 steps. 0.75x preserves partial credit for good routing
+    # before exhaustion, but makes budget-exhausted policies non-competitive.
+    episode_terminated_early = any(h.get('budget_exhausted', False) for h in history)
+    if episode_terminated_early:
+        overall = overall * 0.75
 
     overall = max(0.0, min(1.0, overall))
     return {

@@ -1,209 +1,209 @@
 {
-  "timestamp": "20260408_134535",
-  "ppo_mean": 0.69023,
-  "ppo_std": 0.034470407598402426,
+  "timestamp": "20260424_201000",
+  "ppo_mean": 0.69507,
+  "ppo_std": 0.03783793070451924,
   "ppo_ci": [
-    0.6655730690259392,
-    0.7148869309740609
+    0.6680042554793038,
+    0.7221357445206962
   ],
-  "heu_mean": 0.60944,
-  "heu_std": 0.028220016536730327,
+  "heu_mean": 0.60779,
+  "heu_std": 0.038213652301529906,
   "heu_ci": [
-    0.5892540187972345,
-    0.6296259812027655
+    0.5804554991132379,
+    0.6351245008867622
   ],
-  "delta": 0.08079000000000003,
-  "delta_pct": 13.256432134418489,
+  "delta": 0.08727999999999991,
+  "delta_pct": 14.360223103374507,
   "win_rate": 1.0,
   "episodes": [
     {
       "seed": 0,
       "ppo": {
-        "overall_score": 0.6554,
+        "overall_score": 0.6874,
         "success_score": 0.65,
-        "latency_score": 0.5949,
-        "budget_score": 0.0909,
+        "latency_score": 0.6472,
+        "budget_score": 0.1818,
         "sla_score": 1.0,
-        "adaptation_score": 0.8889
+        "adaptation_score": 0.9286
       },
       "heuristic": {
-        "overall_score": 0.5987,
-        "success_score": 0.6,
-        "latency_score": 0.5194,
-        "budget_score": 0.0545,
-        "sla_score": 0.9333,
-        "adaptation_score": 0.8333
+        "overall_score": 0.5569,
+        "success_score": 0.65,
+        "latency_score": 0.4686,
+        "budget_score": 0.0364,
+        "sla_score": 0.9474,
+        "adaptation_score": 0.6032
       }
     },
     {
       "seed": 1,
       "ppo": {
-        "overall_score": 0.6866,
-        "success_score": 0.7,
-        "latency_score": 0.6205,
-        "budget_score": 0.0909,
+        "overall_score": 0.7332,
+        "success_score": 0.75,
+        "latency_score": 0.6886,
+        "budget_score": 0.1364,
         "sla_score": 1.0,
-        "adaptation_score": 0.9444
+        "adaptation_score": 1.0
       },
       "heuristic": {
-        "overall_score": 0.6235,
+        "overall_score": 0.6077,
         "success_score": 0.7,
-        "latency_score": 0.5122,
-        "budget_score": 0.0364,
+        "latency_score": 0.5213,
+        "budget_score": 0.0455,
         "sla_score": 1.0,
-        "adaptation_score": 0.7778
+        "adaptation_score": 0.6833
       }
     },
     {
       "seed": 2,
       "ppo": {
-        "overall_score": 0.7255,
+        "overall_score": 0.7226,
         "success_score": 0.75,
-        "latency_score": 0.6845,
-        "budget_score": 0.0909,
+        "latency_score": 0.6358,
+        "budget_score": 0.1364,
         "sla_score": 1.0,
         "adaptation_score": 1.0
       },
       "heuristic": {
-        "overall_score": 0.6609,
-        "success_score": 0.75,
-        "latency_score": 0.5971,
-        "budget_score": 0.0727,
+        "overall_score": 0.6165,
+        "success_score": 0.7,
+        "latency_score": 0.4967,
+        "budget_score": 0.2,
         "sla_score": 1.0,
-        "adaptation_score": 0.7778
+        "adaptation_score": 0.6357
       }
     },
     {
       "seed": 3,
       "ppo": {
-        "overall_score": 0.6833,
-        "success_score": 0.7,
-        "latency_score": 0.6041,
-        "budget_score": 0.0909,
+        "overall_score": 0.7411,
+        "success_score": 0.75,
+        "latency_score": 0.7281,
+        "budget_score": 0.1364,
         "sla_score": 1.0,
-        "adaptation_score": 0.9444
+        "adaptation_score": 1.0
       },
       "heuristic": {
-        "overall_score": 0.5782,
-        "success_score": 0.65,
-        "latency_score": 0.4427,
-        "budget_score": 0.1273,
-        "sla_score": 1.0,
-        "adaptation_score": 0.6278
+        "overall_score": 0.6289,
+        "success_score": 0.7,
+        "latency_score": 0.5416,
+        "budget_score": 0.2091,
+        "sla_score": 0.95,
+        "adaptation_score": 0.6833
       }
     },
     {
       "seed": 4,
       "ppo": {
-        "overall_score": 0.7247,
-        "success_score": 0.75,
-        "latency_score": 0.6802,
-        "budget_score": 0.0909,
+        "overall_score": 0.6505,
+        "success_score": 0.6,
+        "latency_score": 0.6288,
+        "budget_score": 0.1818,
         "sla_score": 1.0,
-        "adaptation_score": 1.0
+        "adaptation_score": 0.8375
       },
       "heuristic": {
-        "overall_score": 0.6139,
-        "success_score": 0.7,
-        "latency_score": 0.5247,
+        "overall_score": 0.5933,
+        "success_score": 0.65,
+        "latency_score": 0.5175,
         "budget_score": 0.0818,
         "sla_score": 1.0,
-        "adaptation_score": 0.6833
+        "adaptation_score": 0.6625
       }
     },
     {
       "seed": 5,
       "ppo": {
-        "overall_score": 0.6472,
-        "success_score": 0.65,
-        "latency_score": 0.5539,
-        "budget_score": 0.0909,
+        "overall_score": 0.6608,
+        "success_score": 0.6,
+        "latency_score": 0.6144,
+        "budget_score": 0.1364,
         "sla_score": 1.0,
-        "adaptation_score": 0.8889
+        "adaptation_score": 0.9375
       },
       "heuristic": {
-        "overall_score": 0.5898,
-        "success_score": 0.5,
-        "latency_score": 0.4774,
+        "overall_score": 0.607,
+        "success_score": 0.65,
+        "latency_score": 0.5142,
         "budget_score": 0.0364,
-        "sla_score": 1.0,
-        "adaptation_score": 0.9444
+        "sla_score": 0.9412,
+        "adaptation_score": 0.8125
       }
     },
     {
       "seed": 6,
       "ppo": {
-        "overall_score": 0.7317,
+        "overall_score": 0.7384,
         "success_score": 0.75,
-        "latency_score": 0.7151,
-        "budget_score": 0.0909,
+        "latency_score": 0.7149,
+        "budget_score": 0.1364,
         "sla_score": 1.0,
         "adaptation_score": 1.0
       },
       "heuristic": {
-        "overall_score": 0.6526,
-        "success_score": 0.75,
-        "latency_score": 0.5899,
-        "budget_score": 0.0273,
+        "overall_score": 0.6546,
+        "success_score": 0.65,
+        "latency_score": 0.5611,
+        "budget_score": 0.4545,
         "sla_score": 1.0,
-        "adaptation_score": 0.7778
+        "adaptation_score": 0.6458
       }
     },
     {
       "seed": 7,
       "ppo": {
-        "overall_score": 0.6417,
-        "success_score": 0.6,
-        "latency_score": 0.5674,
-        "budget_score": 0.1364,
+        "overall_score": 0.6827,
+        "success_score": 0.65,
+        "latency_score": 0.6357,
+        "budget_score": 0.1818,
         "sla_score": 1.0,
-        "adaptation_score": 0.8889
+        "adaptation_score": 0.9167
       },
       "heuristic": {
-        "overall_score": 0.5994,
+        "overall_score": 0.6477,
         "success_score": 0.7,
-        "latency_score": 0.4728,
-        "budget_score": 0.1545,
-        "sla_score": 0.9,
-        "adaptation_score": 0.6833
+        "latency_score": 0.5613,
+        "budget_score": 0.0364,
+        "sla_score": 1.0,
+        "adaptation_score": 0.85
       }
     },
     {
       "seed": 8,
       "ppo": {
-        "overall_score": 0.684,
-        "success_score": 0.7,
-        "latency_score": 0.6073,
-        "budget_score": 0.0909,
+        "overall_score": 0.6376,
+        "success_score": 0.6,
+        "latency_score": 0.5641,
+        "budget_score": 0.1818,
         "sla_score": 1.0,
-        "adaptation_score": 0.9444
+        "adaptation_score": 0.8375
       },
       "heuristic": {
-        "overall_score": 0.5893,
-        "success_score": 0.65,
-        "latency_score": 0.4797,
-        "budget_score": 0.1,
-        "sla_score": 1.0,
-        "adaptation_score": 0.6667
+        "overall_score": 0.5338,
+        "success_score": 0.6,
+        "latency_score": 0.4135,
+        "budget_score": 0.2,
+        "sla_score": 0.85,
+        "adaptation_score": 0.5682
       }
     },
     {
       "seed": 9,
       "ppo": {
-        "overall_score": 0.7222,
-        "success_score": 0.75,
-        "latency_score": 0.6679,
-        "budget_score": 0.0909,
+        "overall_score": 0.6964,
+        "success_score": 0.7,
+        "latency_score": 0.6295,
+        "budget_score": 0.1364,
         "sla_score": 1.0,
-        "adaptation_score": 1.0
+        "adaptation_score": 0.95
       },
       "heuristic": {
-        "overall_score": 0.5881,
-        "success_score": 0.6,
-        "latency_score": 0.5197,
-        "budget_score": 0.3,
-        "sla_score": 0.95,
-        "adaptation_score": 0.5833
+        "overall_score": 0.6315,
+        "success_score": 0.7,
+        "latency_score": 0.5336,
+        "budget_score": 0.0818,
+        "sla_score": 1.0,
+        "adaptation_score": 0.7625
       }
     }
   ]
