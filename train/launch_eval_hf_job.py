@@ -98,7 +98,7 @@ def main() -> None:
         flavor=args.flavor,
         timeout=args.timeout,
         namespace=namespace,
-        labels={"task": "budget-router-eval", "model": args.model_path.replace("/", "_")},
+        labels={"task": "budget-router-eval"},
     )
 
     print(f"Eval job started: {job.id}")
