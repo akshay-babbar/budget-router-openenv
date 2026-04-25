@@ -93,6 +93,33 @@ LIGHT_CSS = """
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
+
+/* Episode history tables: expand to content (no internal scroll box) */
+.episode-history-table,
+.episode-history-table > div,
+.episode-history-table .html-container {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+.episode-history-table table {
+  width: 100% !important;
+}
+
+/* Side-by-side history row readability (no overlap, no inner scroll) */
+.episode-history-row .episode-history-table table {
+  table-layout: fixed;
+}
+
+.episode-history-row .episode-history-table th,
+.episode-history-row .episode-history-table td {
+  font-size: 11px !important;
+  padding: 4px 3px !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+}
 """
 
 THEME = gr.themes.Default(

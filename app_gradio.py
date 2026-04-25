@@ -64,7 +64,7 @@ def build_app() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("## Policy A")
+                left_title = gr.Markdown("## Policy A")
                 left_policy = gr.Dropdown(choices=POLICY_CHOICES, value=None, label="Select policy")
                 left_status = gr.Textbox(label="Status", interactive=False, lines=2)
                 left_providers = gr.HTML(_PROVIDER_EMPTY())
@@ -93,7 +93,7 @@ def build_app() -> gr.Blocks:
                 )
 
             with gr.Column(scale=1):
-                gr.Markdown("## Policy B")
+                right_title = gr.Markdown("## Policy B")
                 right_policy = gr.Dropdown(choices=POLICY_CHOICES, value=None, label="Select policy")
                 right_status = gr.Textbox(label="Status", interactive=False, lines=2)
                 right_providers = gr.HTML(_PROVIDER_EMPTY())
@@ -138,20 +138,20 @@ def build_app() -> gr.Blocks:
         gr.Markdown("### Budget Consumed (comparison)")
         budget_plot = gr.Plot()
 
-        with gr.Row():
+        with gr.Row(elem_classes=["episode-history-row"]):
             with gr.Column(scale=1):
-                gr.Markdown("### Step History — Policy A")
-                left_history_tbl = gr.HTML(render_history_table_compare([]))
+                left_history_title = gr.Markdown("### Step History — Policy A")
+                left_history_tbl = gr.HTML(render_history_table_compare([]), elem_classes=["episode-history-table"])
             with gr.Column(scale=1):
-                gr.Markdown("### Step History — Policy B")
-                right_history_tbl = gr.HTML(render_history_table_compare([]))
+                right_history_title = gr.Markdown("### Step History — Policy B")
+                right_history_tbl = gr.HTML(render_history_table_compare([]), elem_classes=["episode-history-table"])
 
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### Episode Grade — Policy A")
+                left_grade_title = gr.Markdown("### Episode Grade — Policy A")
                 left_grade = gr.HTML(_GRADER_PENDING())
             with gr.Column(scale=1):
-                gr.Markdown("### Episode Grade — Policy B")
+                right_grade_title = gr.Markdown("### Episode Grade — Policy B")
                 right_grade = gr.HTML(_GRADER_PENDING())
 
         gr.Markdown("### Incident Timeline")
@@ -238,12 +238,30 @@ def build_app() -> gr.Blocks:
         ]
 
         def _update_start_enabled(p1: Optional[str], p2: Optional[str], run: Dict):
+            left_name = str(p1 or "Policy A")
+            right_name = str(p2 or "Policy B")
             running = bool((run or {}).get("running", False))
             ok = (bool(p1) and bool(p2)) and (not running)
-            return gr.update(interactive=ok)
+            return (
+                gr.update(interactive=ok),
+                f"## {left_name}",
+                f"## {right_name}",
+                f"### Step History — {left_name}",
+                f"### Step History — {right_name}",
+                f"### Episode Grade — {left_name}",
+                f"### Episode Grade — {right_name}",
+            )
 
-        left_policy.change(_update_start_enabled, inputs=[left_policy, right_policy, run_state], outputs=[start_btn])
-        right_policy.change(_update_start_enabled, inputs=[left_policy, right_policy, run_state], outputs=[start_btn])
+        left_policy.change(
+            _update_start_enabled,
+            inputs=[left_policy, right_policy, run_state],
+            outputs=[start_btn, left_title, right_title, left_history_title, right_history_title, left_grade_title, right_grade_title],
+        )
+        right_policy.change(
+            _update_start_enabled,
+            inputs=[left_policy, right_policy, run_state],
+            outputs=[start_btn, left_title, right_title, left_history_title, right_history_title, left_grade_title, right_grade_title],
+        )
 
         scenario_sel.change(lambda s: render_incident_timeline(s), inputs=[scenario_sel], outputs=[incidents_html])
 
@@ -317,12 +335,13 @@ def build_app() -> gr.Blocks:
                 side["status"] = f"❌ Policy error: {exc}"
                 return side
 
+            pre_obs = dict(side.get("obs", {}) or {})
             obs_obj = env.step(Action(action_type=ActionType(action_str)))
             obs = _observation_to_dict(obs_obj)
             reward = float(obs.get("reward", 0.0) or 0.0)
             meta = dict(obs.get("metadata", {}) or {})
             done = bool(obs.get("done", False))
-            side["history"].append(record_step(global_step, action_str, obs, reward, meta))
+            side["history"].append(record_step(global_step, action_str, obs, reward, meta, health_obs=pre_obs))
             side["obs"] = obs
             side["cumulative_reward"] = float(side.get("cumulative_reward", 0.0) or 0.0) + reward
             side["done"] = done

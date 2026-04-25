@@ -437,7 +437,7 @@ _ACTION_COLORS = {
 
 
 def render_history_table_compare(history: List[Dict]) -> str:
-    headers = ["Step", "Action", "OK", "SLA", "Latency(ms)", "Budget", "Reward"]
+    headers = ["Step", "Action", "Health A", "Health B", "Health C", "OK", "SLA", "Latency(ms)", "Budget", "Reward"]
     head = _tr([_th(h) for h in headers], style=_HEADER_ROW_STYLE)
     if not history:
         body = _tr(
@@ -463,6 +463,9 @@ def render_history_table_compare(history: List[Dict]) -> str:
                     [
                         _td(str(h["step"]), _CELL_STYLE),
                         _td(action, f"{_ACTION_CELL_STYLE};background:{action_color}"),
+                        _td(f"{float(h.get('health_a', 0.0) or 0.0):.2f}", _CELL_STYLE),
+                        _td(f"{float(h.get('health_b', 0.0) or 0.0):.2f}", _CELL_STYLE),
+                        _td(f"{float(h.get('health_c', 0.0) or 0.0):.2f}", _CELL_STYLE),
                         _td(ok_cell, _CELL_STYLE),
                         _td(sla_cell, _CELL_STYLE),
                         _td(f"{latency_ms:.0f}", _CELL_STYLE),

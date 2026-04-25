@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from budget_router.models import Observation
 
@@ -34,13 +34,21 @@ def _observation_to_dict(observation: Observation) -> Dict[str, Any]:
     }
 
 
-def record_step(step: int, action: str, obs: Dict, reward: float, meta: Dict) -> Dict:
+def record_step(
+    step: int,
+    action: str,
+    obs: Dict,
+    reward: float,
+    meta: Dict,
+    health_obs: Optional[Dict] = None,
+) -> Dict:
+    health_source = health_obs or obs
     return {
         "step": step,
         "action": action,
-        "health_a": obs.get("provider_a_status", 0),
-        "health_b": obs.get("provider_b_status", 0),
-        "health_c": obs.get("provider_c_status", 0),
+        "health_a": health_source.get("provider_a_status", 0),
+        "health_b": health_source.get("provider_b_status", 0),
+        "health_c": health_source.get("provider_c_status", 0),
         "budget": obs.get("budget_remaining", 0),
         "reward": reward,
         "meta_raw": dict(meta or {}),
