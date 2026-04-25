@@ -18,6 +18,9 @@ Usage:
     # Specific tasks:
     uv run python eval_all.py --tasks hard hard_multi --seeds 5
 
+    # Explicit fresh seed bucket:
+    uv run python eval_all.py --tasks hard_multi --seed-values "200,201,202"
+
 Prerequisites:
     export HF_TOKEN=<your_hf_token>          # required for LLM policy
     export API_BASE_URL=https://router.huggingface.co/v1  # default
@@ -59,7 +62,7 @@ TASKS: Dict[str, TaskConfig] = {
 
 SEED_SETS: Dict[str, List[int]] = {
     "dev":    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    "heldout": [100, 101, 102, 103, 104],
+    "heldout": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109],
 }
 
 API_KEY      = os.getenv("API_KEY") or os.getenv("HF_TOKEN")
@@ -67,6 +70,21 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
 LLM_LOG_RAW = (os.getenv("LLM_LOG_RAW") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 LLM_LOG_RAW_MAX_CHARS = int(os.getenv("LLM_LOG_RAW_MAX_CHARS") or "220")
+
+
+def select_seeds(seed_set: str, seeds: int, seed_values: Optional[str] = None) -> List[int]:
+    """Resolve either a named seed set or an explicit comma/space-separated seed list."""
+    if seed_values is not None:
+        parsed = [int(part) for part in seed_values.replace(",", " ").split()]
+        if not parsed:
+            raise ValueError("No explicit seeds provided in --seed-values")
+        return parsed
+
+    if seed_set not in SEED_SETS:
+        raise ValueError(f"Unknown seed set: {seed_set}. Choose from: {list(SEED_SETS)}")
+
+    named_seeds = SEED_SETS[seed_set]
+    return named_seeds[:max(1, min(seeds, len(named_seeds)))]
 
 
 def _single_line(value: str | None) -> str:
@@ -213,13 +231,18 @@ def main(
     tasks:    List[str] = typer.Option(["easy", "medium", "hard", "hard_multi"], help="Tasks"),
     seeds:    int       = typer.Option(3, help="Number of dev seeds (1-10, costs scale with LLM)"),
     seed_set: str       = typer.Option("dev", help="Seed set: dev | heldout"),
+    seed_values: Optional[str] = typer.Option(None, help="Explicit comma/space-separated seeds; overrides --seed-set/--seeds"),
     out_dir:  Path      = typer.Option(Path("outputs"), help="Output directory"),
 ) -> None:
     """Run Budget Router evaluation across policies, tasks, and seeds."""
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    selected_seeds = SEED_SETS[seed_set][:max(1, min(seeds, len(SEED_SETS[seed_set])))]
+    try:
+        selected_seeds = select_seeds(seed_set=seed_set, seeds=seeds, seed_values=seed_values)
+    except ValueError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     selected_tasks = {t: TASKS[t] for t in tasks if t in TASKS}
 
     if not selected_tasks:
