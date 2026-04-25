@@ -92,11 +92,11 @@ def main() -> None:
     namespace = args.namespace or api.whoami()["name"]
     if args.smoke:
         timeout = "15m"
-        hub_repo = args.hub_repo or f"{namespace}/sft-qwen3-1.7b-budget-router-smoke"
+        hub_repo = args.hub_repo or f"{namespace}/sft-action-qwen3-1.7b-budget-router-smoke"
         train_args = f"--smoke --push-to-hub {hub_repo}"
     else:
         timeout = "75m"
-        hub_repo = args.hub_repo or f"{namespace}/sft-qwen3-1.7b-budget-router"
+        hub_repo = args.hub_repo or f"{namespace}/sft-action-qwen3-1.7b-budget-router"
         train_args = f"--full --push-to-hub {hub_repo}"
 
     # Preflight this locally before spending A10G time. This catches read-only

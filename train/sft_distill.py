@@ -1,5 +1,5 @@
 """
-sft_distill.py — Distill the heuristic policy into Qwen3-1.7B via TRL SFTTrainer.
+sft_distill.py — Distill the heuristic policy into Qwen3-1.7B with action-only SFT.
 
 OBJECTIVE
     Beat the heuristic baseline on hard_multi by supervised-fine-tuning a 1.7B
@@ -16,6 +16,10 @@ WHY THIS IS PARETO-OPTIMAL FOR THE HACKATHON
       free quality lift, no extra compute, well-documented technique.
     • LoRA r=8 on q_proj/v_proj — same low-capacity adapter as the GRPO setup,
       keeps overfit risk small and matches the existing repo conventions.
+    • Action-only loss: prompt/history tokens are masked out; the model is
+      trained only on the next action string. This avoids the failure mode where
+      token accuracy improves by reconstructing repeated observation text while
+      policy rollout remains poor.
     • One file, two modes (--smoke / --full). Reuses train/eval_trained.py for
       the in-script smoke evaluation — single source of truth for eval logic.
 
@@ -63,10 +67,9 @@ EVALUATION  (after the job finishes — model lives on the Hub, NOT on your lapt
             --n-episodes 10
 
 DESIGN NOTES (anti-overfit, no over-engineering)
-    • assistant_only_loss is OFF — Qwen3's stock chat template lacks
-      {% generation %} markers, and pulling a remote template at job-time adds
-      fragility. The action strings are short ("route_to_a") so loss dilution
-      from user-token training is minor and bounded.
+    • Action-only labels are created manually instead of relying on TRL template
+      generation masks. This is explicit, version-tolerant, and directly matches
+      the decision task.
     • No gradient checkpointing — Qwen3-1.7B + LoRA fits A10G-large (24 GB)
       easily at batch_size=4.
     • No remote dataset upload — trajectories are generated in-process from
@@ -78,6 +81,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from dataclasses import dataclass
 
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -87,9 +91,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import torch
 from datasets import Dataset
-from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from trl import SFTConfig, SFTTrainer
+from peft import LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer, Trainer, TrainingArguments
 
 from budget_router.environment import BudgetRouterEnv
 from budget_router.policies import heuristic_baseline_policy
@@ -100,6 +103,7 @@ from budget_router.tasks import HARD_MULTI
 # This guarantees zero train/eval distribution shift.
 from train.eval_trained import (  # noqa: E402
     SYSTEM_PROMPT,
+    _apply_chat_template,
     _obs_to_text,
     run_episode_heuristic,
     run_episode_llm,
@@ -136,6 +140,76 @@ def filter_top_half(examples: list[dict]) -> list[dict]:
         return examples
     examples_sorted = sorted(examples, key=lambda e: e["grader"], reverse=True)
     return examples_sorted[: len(examples_sorted) // 2]
+
+
+def build_action_only_examples(
+    episodes: list[dict],
+    tokenizer,
+    max_length: int,
+) -> list[dict]:
+    """
+    Convert filtered episodes into per-decision causal-LM examples.
+
+    Input tokens contain system prompt + history + current observation. Labels
+    are -100 for all prompt/history tokens and real ids only for the target
+    action string. This trains exactly the thing eval needs: next action.
+    """
+    eos = tokenizer.eos_token or ""
+    rows: list[dict] = []
+    for episode in episodes:
+        messages = episode["messages"]
+        context = [messages[0]]
+        for idx in range(1, len(messages), 2):
+            if idx + 1 >= len(messages):
+                break
+            user_msg = messages[idx]
+            assistant_msg = messages[idx + 1]
+            prompt_messages = context + [user_msg]
+            prompt = _apply_chat_template(
+                tokenizer, prompt_messages, add_generation_prompt=True
+            )
+            action_text = assistant_msg["content"].strip()
+            target_text = action_text + eos
+            prompt_ids = tokenizer(
+                prompt, add_special_tokens=False, truncation=False
+            )["input_ids"]
+            target_ids = tokenizer(
+                target_text, add_special_tokens=False, truncation=False
+            )["input_ids"]
+            input_ids = prompt_ids + target_ids
+            labels = [-100] * len(prompt_ids) + target_ids
+            if len(input_ids) > max_length:
+                overflow = len(input_ids) - max_length
+                input_ids = input_ids[overflow:]
+                labels = labels[overflow:]
+            if all(label == -100 for label in labels):
+                continue
+            rows.append(
+                {
+                    "input_ids": input_ids,
+                    "attention_mask": [1] * len(input_ids),
+                    "labels": labels,
+                    "action": action_text,
+                }
+            )
+            context.extend([user_msg, assistant_msg])
+    return rows
+
+
+@dataclass
+class ActionOnlyCollator:
+    tokenizer: object
+
+    def __call__(self, features: list[dict]) -> dict[str, torch.Tensor]:
+        max_len = max(len(f["input_ids"]) for f in features)
+        pad_id = self.tokenizer.pad_token_id
+        batch = {"input_ids": [], "attention_mask": [], "labels": []}
+        for feature in features:
+            pad_len = max_len - len(feature["input_ids"])
+            batch["input_ids"].append(feature["input_ids"] + [pad_id] * pad_len)
+            batch["attention_mask"].append(feature["attention_mask"] + [0] * pad_len)
+            batch["labels"].append(feature["labels"] + [-100] * pad_len)
+        return {k: torch.tensor(v, dtype=torch.long) for k, v in batch.items()}
 
 
 def main() -> None:
@@ -179,7 +253,7 @@ def main() -> None:
     if args.smoke:
         n_episodes = 200
         n_epochs = 1
-        max_steps = 30
+        max_steps = 80
         smoke_eval_seeds = [0, 1, 2]
         suffix = "_smoke"
     else:
@@ -223,8 +297,6 @@ def main() -> None:
         f"teacher_mean={teacher_mean:.4f} kept_mean={kept_mean:.4f}"
     )
 
-    dataset = Dataset.from_list([{"messages": e["messages"]} for e in examples])
-
     print(f"\n[2/3] Loading {args.model_name}...")
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name, dtype=dtype, trust_remote_code=True
@@ -232,6 +304,33 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    max_length = 2048
+    action_rows = build_action_only_examples(examples, tokenizer, max_length=max_length)
+    if not action_rows:
+        print("❌ No action-only training examples produced.")
+        sys.exit(1)
+    action_counts = {
+        action: sum(1 for row in action_rows if row["action"] == action)
+        for action in sorted({row["action"] for row in action_rows})
+    }
+    supervised_tokens = sum(
+        sum(1 for label in row["labels"] if label != -100) for row in action_rows
+    )
+    print(
+        f"      Built {len(action_rows)} action-only decisions; "
+        f"supervised_action_tokens={supervised_tokens}; actions={action_counts}"
+    )
+    dataset = Dataset.from_list(
+        [
+            {
+                "input_ids": row["input_ids"],
+                "attention_mask": row["attention_mask"],
+                "labels": row["labels"],
+            }
+            for row in action_rows
+        ]
+    )
 
     peft_config = LoraConfig(
         r=8,
@@ -241,8 +340,9 @@ def main() -> None:
         bias="none",
         task_type="CAUSAL_LM",
     )
+    model = get_peft_model(model, peft_config)
 
-    sft_config = SFTConfig(
+    training_args = TrainingArguments(
         output_dir=output_dir + "_checkpoints",
         num_train_epochs=n_epochs,
         max_steps=max_steps,
@@ -257,15 +357,14 @@ def main() -> None:
         report_to="none",
         remove_unused_columns=False,
         dataloader_num_workers=0,
-        max_length=2048,
     )
 
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,
         processing_class=tokenizer,
         train_dataset=dataset,
-        args=sft_config,
-        peft_config=peft_config,
+        args=training_args,
+        data_collator=ActionOnlyCollator(tokenizer),
     )
 
     print("\n[3/3] Training SFT...\n")
@@ -293,14 +392,19 @@ def main() -> None:
         heur_mean = sum(heur_scores) / len(heur_scores)
         print(f"\n  Mean: SFT={sft_mean:.4f}  HEU={heur_mean:.4f}")
         print()
-        # Decision rule: random/garbage policies score ~0.15–0.25 on hard_multi.
-        # If SFT > 0.40 we have evidence the format & policy are being learned.
-        if sft_mean >= 0.40:
-            print("  ✅ EVIDENCE: SFT learned the action format and is producing useful actions.")
-            print("     Proceed to --full for the real comparison.")
+        # Decision rule for the hackathon objective:
+        # - <0.40: format/policy broken.
+        # - >= heuristic - 0.02: worth scaling or using as a GRPO warm start.
+        # Anything in between is useful evidence but not enough for a full run.
+        if sft_mean >= heur_mean - 0.02:
+            print("  ✅ STRONG EVIDENCE: action-only SFT is near the heuristic baseline.")
+            print("     Proceed to 10-seed eval, then consider --full or GRPO warm start.")
+        elif sft_mean >= 0.40:
+            print("  ⚠️  PARTIAL EVIDENCE: action-only SFT learned valid routing but trails heuristic.")
+            print("     Do a 10-seed eval before spending on --full.")
         else:
             print("  ❌ NO EVIDENCE: SFT output looks broken (likely format mismatch or under-training).")
-            print("     Investigate before spending money on --full.")
+            print("     Investigate before spending money on --full or GRPO.")
 
     # ── Push to HF Hub (REQUIRED on ephemeral HF Jobs containers) ──────────
     if args.push_to_hub:
