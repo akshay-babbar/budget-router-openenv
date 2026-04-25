@@ -277,14 +277,6 @@ def main() -> None:
     tokenizer.save_pretrained(output_dir)
     print(f"✅ Saved locally to {output_dir}")
 
-    # ── Push to HF Hub (REQUIRED on ephemeral HF Jobs containers) ──────────
-    if args.push_to_hub:
-        print(f"\nPushing merged model to https://huggingface.co/{args.push_to_hub} ...")
-        merged.push_to_hub(args.push_to_hub, private=args.hub_private)
-        tokenizer.push_to_hub(args.push_to_hub, private=args.hub_private)
-        print(f"✅ Pushed to hub: {args.push_to_hub}")
-        print(f"   Eval locally with:  uv run python train/eval_trained.py --model-path {args.push_to_hub}")
-
     # ── Smoke eval: prove the pipeline is end-to-end working ────────────────
     if args.smoke:
         print(f"\n[smoke eval] hard_multi seeds {smoke_eval_seeds}  (SFT vs Heuristic)")
@@ -309,6 +301,14 @@ def main() -> None:
         else:
             print("  ❌ NO EVIDENCE: SFT output looks broken (likely format mismatch or under-training).")
             print("     Investigate before spending money on --full.")
+
+    # ── Push to HF Hub (REQUIRED on ephemeral HF Jobs containers) ──────────
+    if args.push_to_hub:
+        print(f"\nPushing merged model to https://huggingface.co/{args.push_to_hub} ...")
+        merged.push_to_hub(args.push_to_hub, private=args.hub_private)
+        tokenizer.push_to_hub(args.push_to_hub, private=args.hub_private)
+        print(f"✅ Pushed to hub: {args.push_to_hub}")
+        print(f"   Eval locally with:  uv run python train/eval_trained.py --model-path {args.push_to_hub}")
 
 
 if __name__ == "__main__":

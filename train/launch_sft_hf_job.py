@@ -83,29 +83,34 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.smoke:
-        timeout = "15m"
-        hub_repo = args.hub_repo or "akshay-babbar/sft-qwen3-1.7b-budget-router-smoke"
-        train_args = f"--smoke --push-to-hub {hub_repo}"
-    else:
-        timeout = "75m"
-        hub_repo = args.hub_repo or "akshay-babbar/sft-qwen3-1.7b-budget-router"
-        train_args = f"--full --push-to-hub {hub_repo}"
-
     token = os.environ.get("HF_TOKEN") or get_token()
     if not token:
         print("ERROR: No Hugging Face token found. Run `hf auth login` first.", file=sys.stderr)
         sys.exit(2)
 
-    script = build_job_script(branch=args.branch, train_args=train_args)
     api = HfApi(token=token)
+    namespace = args.namespace or api.whoami()["name"]
+    if args.smoke:
+        timeout = "15m"
+        hub_repo = args.hub_repo or f"{namespace}/sft-qwen3-1.7b-budget-router-smoke"
+        train_args = f"--smoke --push-to-hub {hub_repo}"
+    else:
+        timeout = "75m"
+        hub_repo = args.hub_repo or f"{namespace}/sft-qwen3-1.7b-budget-router"
+        train_args = f"--full --push-to-hub {hub_repo}"
+
+    # Preflight this locally before spending A10G time. This catches read-only
+    # tokens and wrong namespaces (the exact 403 failure mode from the smoke job).
+    api.create_repo(repo_id=hub_repo, repo_type="model", exist_ok=True)
+
+    script = build_job_script(branch=args.branch, train_args=train_args)
     job = api.run_job(
         image=args.image,
         command=["/bin/bash", "-lc", script],
         secrets={"HF_TOKEN": token},
         flavor=args.flavor,
         timeout=timeout,
-        namespace=args.namespace,
+        namespace=namespace,
         labels={"task": "budget-router-sft", "mode": "smoke" if args.smoke else "full"},
     )
 
