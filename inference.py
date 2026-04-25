@@ -77,56 +77,69 @@ TASK PROFILES (the task name appears in each observation — use it):
 Output only the action string."""
 
 OBJECTIVE_FEEDBACK_PROMPT = """
-You are a cost-aware LLM API routing agent managing a production system.
-At each step, output EXACTLY ONE action string. Nothing else.
+You are a budget-aware API routing agent managing a production system.
+At each step, output EXACTLY ONE action string and nothing else.
 
-ENVIRONMENT:
-  Three providers: A ($0.01/req, cheapest), B ($0.05/req), C ($0.10/req, most reliable).
-  provider_X_status = windowed success rate [0=always fails, 1=always succeeds].
-    IMPORTANT: A status of exactly 0.500 means this provider has NEVER been routed to
-    in this episode — it is unobserved, not confirmed healthy. Route to it once to get
-    a real reading. Do not treat 0.500 as a health signal.
-  budget_remaining: fraction of budget left. Reaching 0 = catastrophic -10 penalty.
-  step_count [0→1], steps_remaining: episode progress (20 steps total).
+VALID ACTIONS:
+route_to_a | route_to_b | route_to_c | shed_load
 
-VALID ACTIONS (output ONLY one):
-  route_to_a | route_to_b | route_to_c | shed_load
+ENVIRONMENT INTUITION:
+You route one request per step across three providers:
+- A: cheapest ($0.01), useful for conserving budget, but may degrade.
+- B: medium cost ($0.05), usually the bridge provider.
+- C: expensive ($0.10), most reliable, but using it too early can bankrupt the episode.
+- shed_load: reject this request; use only when routing is likely worse than abstaining or budget is critically unsafe.
+
+OBSERVATIONS:
+provider_X_status is a rolling recent success estimate, not true health.
+- Exactly 0.500 means unobserved in this episode: no evidence yet.
+- After one probe, the status may jump to 0.000 or 1.000; that is weak evidence because it may be only one sample.
+- Repeated outcomes, sustained negative trend, worsening reward, or repeated failures are stronger evidence.
+Do not treat a single success as proof of health or a single failure as proof of degradation.
 
 PRIMARY OBJECTIVE:
-  Maximize the full-episode score, not just the next step.
-  The score rewards:
-  - serving requests successfully
-  - keeping latency and SLA healthy
-  - preserving budget
-  - adapting when providers degrade
+Maximize full-episode grader score:
+- successful routed requests
+- low latency and SLA health
+- budget preservation
+- adaptation after provider degradation
 
-DECISION PRINCIPLES:
-  1. Budget survival is mandatory. Avoid the -10 bankruptcy penalty.
-  2. Use the cheapest provider that still looks likely to keep the system healthy.
-  3. Use REAL FEEDBACK from the previous step when available:
-     - if the last routed action failed or produced a strongly negative reward, treat that as evidence
-     - if repeated failures occur on the current provider, switch earlier instead of waiting too long
-  4. Do not switch on a single noisy dip alone. Prefer consistent evidence:
-     declining status, repeated failures, worsening reward, or shrinking budget runway.
-  5. When expensive providers are needed for reliability, use them deliberately and only while affordable.
+DECISION POLICY:
+1. Budget survival is mandatory. Avoid the -10 budget exhaustion cliff.
+2. Prefer the cheapest provider that is plausibly healthy, but do not blindly follow a fixed threshold.
+3. Probe unknown providers when information is valuable and affordable.
+4. Switch away from a provider when there is repeated failure, sustained decline, or clearly bad status.
+5. Use C as late-phase reliability capacity, not as the default.
+6. Prefer shed_load when all available routed choices look likely to fail or when routing would risk budget exhaustion.
 
-NOISE CALIBRATION:
-- Status values are noisy because they come from limited recent outcomes.
-- A single bad observation is weak evidence.
-- Repeated bad outcomes or sustained negative trend are strong evidence.
+TASK-SPECIFIC STRATEGY:
+easy:
+- Stable task. Prefer cheap routing. Do not overreact to noise.
+
+medium:
+- A may degrade after early steps. Start cheap, then move to B when A shows repeated weakness.
+
+hard:
+- A may degrade from the beginning. Probe cheaply, but react faster to repeated A failures or sustained decline.
+
+hard_multi:
+- This is a sequential cascade: A degrades early; B can degrade later.
+- Early phase: conserve budget. Use/probe A only while evidence supports it.
+- Middle phase: B is often the bridge provider after A weakens.
+- Late phase: preserve enough runway for C if B begins failing.
+- Do not burn C too early; do not stay on A/B after repeated failures.
 
 BUDGET RUNWAY:
-- budget_runway_at_current_rate estimates how many more steps are affordable at the current spend rate.
-- If budget_runway_at_current_rate < steps_remaining, current spending is too high.
-- If budget_remaining < 0.15, treat C as expensive emergency capacity, not a default choice.
+If budget_runway_at_current_rate < steps_remaining, current spending is unsafe.
+If budget_remaining < 0.15, treat C as emergency-only unless A and B both look very poor.
+If routing risks budget exhaustion, shed_load is better than bankruptcy.
 
-TASK PROFILES:
-  easy:       Stable environment. Prefer low cost unless strong evidence suggests otherwise.
-  medium:     A provider may degrade mid-episode. Detect and move to the next best affordable option.
-  hard:       Early degradation. React faster once repeated evidence appears.
-  hard_multi: Multiple degradations can happen in sequence. Avoid burning budget too early; preserve runway for the late phase.
+Use previous_step_feedback when present:
+- previous_success=false, negative reward, high latency, or repeated same-provider failures are evidence to update your belief.
+- previous_success=true is useful evidence but not proof, especially after only one sample.
 
-Output only the action string."""
+Output only one valid action string.
+"""
 
 app = typer.Typer(add_completion=False)
 
@@ -143,7 +156,7 @@ BENCHMARK_NAME = os.getenv("BENCHMARK_NAME") or "budget_router"
 
 SEED_SETS: Dict[str, List[int]] = {
     "development": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    "heldout": [100, 101, 102, 103, 104],
+    "heldout": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109],
 }
 TASKS: Dict[str, TaskConfig] = {
     "easy": EASY,
@@ -263,6 +276,7 @@ class LLMRouter:
             )
             raw = response.choices[0].message.content or ""
             action_str = _parse_llm_action(raw)
+            action_str = self._apply_budget_safety_guard(action_str=action_str, observation=obs)
             self.last_raw_output = raw
             self.last_parsed_action = action_str
             self.last_error = None
@@ -273,6 +287,27 @@ class LLMRouter:
             self.last_parsed_action = action_str
         self._messages.append({"role": "assistant", "content": action_str})
         return Action(action_type=ActionType(action_str))
+
+    def _apply_budget_safety_guard(self, action_str: str, observation: Observation) -> str:
+        """Prevent only actions that would immediately exhaust the public remaining budget."""
+        if action_str == "shed_load":
+            return action_str
+
+        scenario = TASKS.get(self._task_name)
+        if scenario is None:
+            return action_str
+
+        action_costs = {
+            "route_to_a": scenario.cost_a,
+            "route_to_b": scenario.cost_b,
+            "route_to_c": scenario.cost_c,
+        }
+        selected_cost = action_costs.get(action_str, 0.0)
+        budget_dollars = float(observation.budget_remaining) * float(scenario.initial_budget)
+
+        if selected_cost >= budget_dollars - 1e-9:
+            return "shed_load"
+        return action_str
 
     def _previous_step_feedback(self, observation: Observation) -> str:
         metadata = getattr(observation, "metadata", None) or {}
