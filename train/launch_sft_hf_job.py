@@ -91,11 +91,11 @@ def main() -> None:
     api = HfApi(token=token)
     namespace = args.namespace or api.whoami()["name"]
     if args.smoke:
-        timeout = "15m"
+        timeout = "30m"
         hub_repo = args.hub_repo or f"{namespace}/sft-action-qwen3-1.7b-budget-router-smoke"
         train_args = f"--smoke --push-to-hub {hub_repo}"
     else:
-        timeout = "75m"
+        timeout = "120m"
         hub_repo = args.hub_repo or f"{namespace}/sft-action-qwen3-1.7b-budget-router"
         train_args = f"--full --push-to-hub {hub_repo}"
 

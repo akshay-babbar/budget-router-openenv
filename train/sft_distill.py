@@ -70,8 +70,9 @@ DESIGN NOTES (anti-overfit, no over-engineering)
     • Action-only labels are created manually instead of relying on TRL template
       generation masks. This is explicit, version-tolerant, and directly matches
       the decision task.
-    • No gradient checkpointing — Qwen3-1.7B + LoRA fits A10G-large (24 GB)
-      easily at batch_size=4.
+    • Recent-history context is capped at 1024 tokens and batch size is 1.
+      This avoids the full-vocab-logit memory spike from causal-LM training
+      while keeping enough recent trajectory context for routing decisions.
     • No remote dataset upload — trajectories are generated in-process from
       the local environment in seconds.
 """
@@ -85,6 +86,7 @@ from dataclasses import dataclass
 
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 # Make `from train.eval_trained import ...` work when invoked as a script.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -301,11 +303,12 @@ def main() -> None:
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name, dtype=dtype, trust_remote_code=True
     )
+    model.config.use_cache = False
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    max_length = 2048
+    max_length = 1024
     action_rows = build_action_only_examples(examples, tokenizer, max_length=max_length)
     if not action_rows:
         print("❌ No action-only training examples produced.")
@@ -341,13 +344,17 @@ def main() -> None:
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, peft_config)
+    if device == "cuda":
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        model.gradient_checkpointing_enable()
 
     training_args = TrainingArguments(
         output_dir=output_dir + "_checkpoints",
         num_train_epochs=n_epochs,
         max_steps=max_steps,
-        per_device_train_batch_size=4,
-        gradient_accumulation_steps=4,
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=16,
         learning_rate=2e-4,
         warmup_ratio=0.1,
         lr_scheduler_type="cosine",
