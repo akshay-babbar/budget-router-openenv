@@ -45,6 +45,32 @@ SYSTEM_PROMPT = (
 _VALID_ACTIONS = ["route_to_a", "route_to_b", "route_to_c", "shed_load"]
 
 
+def _apply_chat_template(tokenizer, messages: list[dict], add_generation_prompt: bool) -> str:
+    """Apply Qwen chat template with thinking disabled when supported."""
+    try:
+        return tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=add_generation_prompt,
+            enable_thinking=False,
+        )
+    except TypeError:
+        # Older Transformers may not expose template kwargs directly.
+        try:
+            return tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=add_generation_prompt,
+                chat_template_kwargs={"enable_thinking": False},
+            )
+        except TypeError:
+            return tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=add_generation_prompt,
+            )
+
+
 def _parse_action(text: str) -> str:
     text = text.strip().lower()
     for a in _VALID_ACTIONS:
@@ -64,25 +90,23 @@ def _obs_to_text(obs: Observation) -> str:
     )
 
 
-def run_episode_llm(model, tokenizer, seed: int, device: str) -> float:
+def run_episode_llm(
+    model,
+    tokenizer,
+    seed: int,
+    device: str,
+    *,
+    debug_generations: bool = False,
+    debug_steps: int = 5,
+) -> float:
     env = BudgetRouterEnv()
     obs = env.reset(scenario=SCENARIO, seed=seed)
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    step_idx = 0
 
     while not obs.done:
         messages.append({"role": "user", "content": _obs_to_text(obs)})
-        try:
-            text = tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,
-                chat_template_kwargs={"enable_thinking": False},
-            )
-        except TypeError:
-            # Older Transformers versions may not expose chat_template_kwargs here.
-            text = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
+        text = _apply_chat_template(tokenizer, messages, add_generation_prompt=True)
         inputs = tokenizer(text, return_tensors="pt").to(device)
         with torch.no_grad():
             out = model.generate(
@@ -95,10 +119,16 @@ def run_episode_llm(model, tokenizer, seed: int, device: str) -> float:
             out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
         )
         action_str = _parse_action(generated)
+        if debug_generations and step_idx < debug_steps:
+            print(
+                f"[debug seed={seed} step={step_idx}] "
+                f"raw={generated!r} parsed={action_str}"
+            )
         messages.append({"role": "assistant", "content": action_str})
 
         action = Action(action_type=ActionType(action_str))
         obs = env.step(action)
+        step_idx += 1
 
     return float(grade_episode(env._internal.history)["overall_score"])
 
@@ -121,6 +151,17 @@ def main():
         help="Path to merged trained model directory (default: trained_models/grpo_Qwen_Qwen3-1.7B).",
     )
     parser.add_argument("--n-episodes", type=int, default=N_EPISODES, help="Number of eval episodes.")
+    parser.add_argument(
+        "--debug-generations",
+        action="store_true",
+        help="Print raw model generations and parsed actions for early steps.",
+    )
+    parser.add_argument(
+        "--debug-steps",
+        type=int,
+        default=5,
+        help="Number of early steps per episode to print when --debug-generations is set.",
+    )
     args = parser.parse_args()
 
     model_path = args.model_path
@@ -152,7 +193,14 @@ def main():
 
     llm_scores, heuristic_scores = [], []
     for seed in range(args.n_episodes):
-        llm_r = run_episode_llm(model, tokenizer, seed, device)
+        llm_r = run_episode_llm(
+            model,
+            tokenizer,
+            seed,
+            device,
+            debug_generations=args.debug_generations,
+            debug_steps=args.debug_steps,
+        )
         heur_r = run_episode_heuristic(seed)
         llm_scores.append(llm_r)
         heuristic_scores.append(heur_r)

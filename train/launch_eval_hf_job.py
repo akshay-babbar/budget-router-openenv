@@ -30,9 +30,21 @@ DEFAULT_BRANCH = "feat/grpo-training-v5"
 DEFAULT_IMAGE = "ghcr.io/astral-sh/uv:python3.11-bookworm"
 
 
-def build_job_script(*, branch: str, model_path: str, n_episodes: int) -> str:
+def build_job_script(
+    *,
+    branch: str,
+    model_path: str,
+    n_episodes: int,
+    debug_generations: bool,
+    debug_steps: int,
+) -> str:
     archive_url = (
         f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/{branch}.zip"
+    )
+    debug_args = (
+        f" --debug-generations --debug-steps {debug_steps}"
+        if debug_generations
+        else ""
     )
     return textwrap.dedent(
         f"""
@@ -63,7 +75,7 @@ def build_job_script(*, branch: str, model_path: str, n_episodes: int) -> str:
         echo "Running in: $PWD"
         echo "Evaluating model: {model_path}"
         uv sync --extra grpo
-        uv run python train/eval_trained.py --model-path {model_path} --n-episodes {n_episodes}
+        uv run python train/eval_trained.py --model-path {model_path} --n-episodes {n_episodes}{debug_args}
         """
     ).strip()
 
@@ -77,6 +89,12 @@ def main() -> None:
     parser.add_argument("--timeout", default="25m")
     parser.add_argument("--image", default=DEFAULT_IMAGE)
     parser.add_argument("--namespace", default=None)
+    parser.add_argument(
+        "--debug-generations",
+        action="store_true",
+        help="Print raw model generations and parsed actions in job logs.",
+    )
+    parser.add_argument("--debug-steps", type=int, default=5)
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN") or get_token()
@@ -90,6 +108,8 @@ def main() -> None:
         branch=args.branch,
         model_path=args.model_path,
         n_episodes=args.n_episodes,
+        debug_generations=args.debug_generations,
+        debug_steps=args.debug_steps,
     )
     job = api.run_job(
         image=args.image,
