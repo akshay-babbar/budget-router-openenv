@@ -51,12 +51,12 @@ def heuristic_baseline_policy(obs: Observation) -> Action:
     if obs.budget_remaining < 0.10:
         # Only consider A ($0.01) and B ($0.05) — skip C
         for action_name, status in providers[:2]:
-            if status > threshold:
+            if status > threshold or status == 0.5:
                 return Action(action_type=ActionType(action_name))
         return Action(action_type=ActionType.SHED_LOAD)
 
     for action_name, status in providers:
-        if status > threshold:
+        if status > threshold or status == 0.5:
             return Action(action_type=ActionType(action_name))
 
     # All providers below threshold → shed load

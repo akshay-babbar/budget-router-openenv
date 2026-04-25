@@ -131,6 +131,16 @@ class BudgetRouterEnv(Environment):
             ),
         }
 
+        # Resolve jittered degradation onsets for this episode
+        _j1 = (self._rng.randint(-config.degradation_start_jitter,
+                                  config.degradation_start_jitter)
+               if config.degradation_start_jitter > 0 else 0)
+        _j2 = (self._rng.randint(-config.secondary_degradation_start_jitter,
+                                  config.secondary_degradation_start_jitter)
+               if config.secondary_degradation_start_jitter > 0 else 0)
+        _actual_primary = max(0, config.degradation_start_step + _j1)
+        _actual_secondary = max(0, config.secondary_degradation_start_step + _j2)
+
         self._internal = InternalState(
             providers=providers,
             budget_dollars=config.initial_budget,
@@ -145,6 +155,8 @@ class BudgetRouterEnv(Environment):
             history=[],
             provider_window={"A": [], "B": [], "C": []},
             window_size=5,
+            actual_degradation_start=_actual_primary,
+            actual_secondary_degradation_start=_actual_secondary,
         )
 
         observation = self._get_obs()
@@ -198,8 +210,9 @@ class BudgetRouterEnv(Environment):
             "action_type": action_type,
             "sla_ceiling_ms": self._config.sla_ceiling_ms,
             "initial_budget": self._internal.initial_budget_dollars,
-            "degradation_start_step": self._config.degradation_start_step,
-            "secondary_degradation_start_step": self._config.secondary_degradation_start_step if self._config.secondary_degradation_target else None,
+            "degradation_start_step": self._internal.actual_degradation_start,
+            "secondary_degradation_start_step": (self._internal.actual_secondary_degradation_start
+                                                  if self._config.secondary_degradation_target else None),
         }
 
         if action_type == "shed_load":
@@ -236,6 +249,7 @@ class BudgetRouterEnv(Environment):
                 action_type
             ]
             provider = self._internal.providers[provider_name]
+            self._internal.probed_providers.add(provider_name)
 
             # Deduct cost
             cost = provider.cost_per_request
@@ -416,10 +430,15 @@ class BudgetRouterEnv(Environment):
         """Convert internal state to normalized [0,1] observation."""
         s = self._internal
 
-        # Provider status: windowed success rate
-        a_status = s.get_windowed_success_rate("A")
-        b_status = s.get_windowed_success_rate("B")
-        c_status = s.get_windowed_success_rate("C")
+        # Provider status: 0.5 for unprobed (max uncertainty), windowed rate if probed
+        def _probed_status(name: str) -> float:
+            if name not in s.probed_providers:
+                return 0.5
+            return s.get_windowed_success_rate(name)
+
+        a_status = _probed_status("A")
+        b_status = _probed_status("B")
+        c_status = _probed_status("C")
 
         # Budget: fraction remaining
         if s.initial_budget_dollars > 0:
@@ -462,14 +481,14 @@ class BudgetRouterEnv(Environment):
         The target provider's health decreases based on:
         - degradation_rate from the TaskConfig
         - A small random perturbation
-        - Only triggers after degradation_start_step
+        - Only triggers after actual_degradation_start (jittered per episode)
         Supports secondary degradation for multi-provider scenarios.
         """
         config = self._config
         step = self._internal.current_step
 
         # Primary degradation
-        if step >= config.degradation_start_step:
+        if step >= self._internal.actual_degradation_start:
             target = config.degradation_target
             provider = self._internal.providers.get(target)
             if provider is not None:
@@ -483,7 +502,7 @@ class BudgetRouterEnv(Environment):
         # Secondary degradation (for multi-provider scenarios)
         if (
             config.secondary_degradation_target
-            and step >= config.secondary_degradation_start_step
+            and step >= self._internal.actual_secondary_degradation_start
         ):
             target = config.secondary_degradation_target
             provider = self._internal.providers.get(target)
