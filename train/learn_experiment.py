@@ -20,7 +20,7 @@ USAGE
 
 KEY DIFFERENCES FROM smoke_test.py
     - max_steps=360 (vs 10)
-    - learning_rate=1e-6 (vs 5e-7 — standard GRPO lr per DeepSeek-R1 paper)
+    - learning_rate=5e-6 (vs 5e-7 — standard GRPO lr per DeepSeek-R1 paper)
     - Proper rollout-only callback: separates data-collection from gradient steps
     - Rolling reward average printed every 10 rollout steps
     - VERDICT analysis at the end
@@ -364,7 +364,7 @@ def main():
         temperature=cli.temperature,
         top_p=cli.top_p,
         beta=0.001,
-        learning_rate=1e-6,
+        learning_rate=5e-6,
         optim="adamw_torch",
         report_to="none",
         logging_steps=1,
