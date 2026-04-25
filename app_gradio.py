@@ -4,550 +4,381 @@ Run: python app_gradio.py  (launches on http://localhost:7860)
 """
 from __future__ import annotations
 
+import math
 import time
-from typing import Any, Dict, List, Optional, Tuple, Protocol
+from typing import Dict, Optional, Tuple
 
 import gradio as gr
-import requests
-from budget_router.models import Observation
-from budget_router.reward import grade_episode
-from inference import select_policy
+from budget_router.environment import BudgetRouterEnv
+from budget_router.models import Action, ActionType
+from budget_router.tasks import TASK_PRESETS
 
-# ─── Config ───────────────────────────────────────────────────────────────────
-
-BASE_URL = "http://localhost:8000"
-AUTO_PLAY_DELAY = 0.5
-MAX_STEPS = 20
-
-SCENARIOS = ["easy", "medium", "hard", "hard_multi"]
-ACTION_CHOICES = [
-    ("🟢 route_to_a ($0.01)", "route_to_a"),
-    ("🟡 route_to_b ($0.05)", "route_to_b"),
-    ("🔴 route_to_c ($0.10)", "route_to_c"),
-    ("⚪ shed_load (-0.5)", "shed_load"),
-]
-
-# Minimal CSS overrides - theme handles most styling via _dark variants
-LIGHT_CSS = """
-/* Force light color scheme */
-:root, .dark {
-  color-scheme: light !important;
-}
-
-/* Ensure all text is dark */
-.gradio-container label,
-.gradio-container span {
-  color: #1f2937 !important;
-}
-
-/* Radio/checkbox label pills - force white background */
-.gradio-container .wrap[data-testid="checkbox-group"] label,
-.gradio-container .wrap[data-testid="radio-group"] label {
-  background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
-  color: #1f2937 !important;
-}
-.gradio-container .wrap[data-testid="checkbox-group"] label.selected,
-.gradio-container .wrap[data-testid="radio-group"] label.selected {
-  background: #eef2ff !important;
-  border-color: #4f46e5 !important;
-}
-"""
-
-THEME = gr.themes.Default(
-    primary_hue=gr.themes.colors.indigo,
-    secondary_hue=gr.themes.colors.indigo,
-    neutral_hue=gr.themes.colors.gray,
-).set(
-    # Body
-    body_background_fill="#f7f8fb",
-    body_background_fill_dark="#f7f8fb",
-    body_text_color="#1f2937",
-    body_text_color_dark="#1f2937",
-    # Blocks
-    block_background_fill="#ffffff",
-    block_background_fill_dark="#ffffff",
-    block_border_color="#e5e7eb",
-    block_border_color_dark="#e5e7eb",
-    block_label_text_color="#1f2937",
-    block_label_text_color_dark="#1f2937",
-    block_title_text_color="#1f2937",
-    block_title_text_color_dark="#1f2937",
-    # Inputs
-    input_background_fill="#ffffff",
-    input_background_fill_dark="#ffffff",
-    input_border_color="#9ca3af",
-    input_border_color_dark="#9ca3af",
-    input_placeholder_color="#6b7280",
-    input_placeholder_color_dark="#6b7280",
-    # Buttons
-    button_primary_background_fill="#4f46e5",
-    button_primary_background_fill_dark="#4f46e5",
-    button_primary_text_color="#ffffff",
-    button_primary_text_color_dark="#ffffff",
-    button_secondary_background_fill="#4f46e5",
-    button_secondary_background_fill_dark="#4f46e5",
-    button_secondary_text_color="#ffffff",
-    button_secondary_text_color_dark="#ffffff",
-    button_secondary_background_fill_hover="#4338ca",
-    button_secondary_background_fill_hover_dark="#4338ca",
-    # Radio/Checkbox - THIS IS THE KEY FIX
-    checkbox_background_color="#ffffff",
-    checkbox_background_color_dark="#ffffff",
-    checkbox_border_color="#d1d5db",
-    checkbox_border_color_dark="#d1d5db",
-    checkbox_label_background_fill="#ffffff",
-    checkbox_label_background_fill_dark="#ffffff",
-    checkbox_label_background_fill_hover="#f3f4f6",
-    checkbox_label_background_fill_hover_dark="#f3f4f6",
-    checkbox_label_background_fill_selected="#eef2ff",
-    checkbox_label_background_fill_selected_dark="#eef2ff",
-    checkbox_label_border_color="#e5e7eb",
-    checkbox_label_border_color_dark="#e5e7eb",
-    checkbox_label_text_color="#1f2937",
-    checkbox_label_text_color_dark="#1f2937",
+from gradio_ui.config import MAX_STEPS as _MAX_STEPS, POLICY_CHOICES, SCENARIOS
+from gradio_ui.policies import get_policy_runner
+from gradio_ui.renderers import (
+    _kpi_grid,
+    render_incident_timeline,
+    render_side_panel,
+    render_grader_plot,
+    render_budget_consumed_plot,
+    _GRADER_PENDING,
+    _PROVIDER_EMPTY,
+    render_history_table_compare,
 )
+from gradio_ui.state import fresh_side_state, _observation_to_dict, record_step
+from gradio_ui.theme import LIGHT_CSS, THEME
 
-# ─── API Client ───────────────────────────────────────────────────────────────
-
-class APIClient:
-    """Single-responsibility HTTP client for the OpenEnv Budget Router API."""
-
-    def __init__(self, base_url: str = BASE_URL) -> None:
-        self.base_url = base_url.rstrip("/")
-
-    def _post(self, path: str, body: Dict) -> Tuple[Optional[Dict], Optional[str]]:
-        try:
-            r = requests.post(f"{self.base_url}{path}", json=body, timeout=15)
-            r.raise_for_status()
-            return r.json(), None
-        except Exception as exc:
-            return None, str(exc)
-
-    def _get(self, path: str) -> Tuple[Optional[Dict], Optional[str]]:
-        try:
-            r = requests.get(f"{self.base_url}{path}", timeout=10)
-            r.raise_for_status()
-            return r.json(), None
-        except Exception as exc:
-            return None, str(exc)
-
-    @staticmethod
-    def _normalize(payload: Dict) -> Tuple[Dict, float, Dict, bool]:
-        """Handle both flat and observation-wrapped response shapes."""
-        obs = payload.get("observation", payload)
-        reward = float(payload.get("reward", obs.get("reward", 0.0)) or 0.0)
-        meta = payload.get("metadata", obs.get("metadata", {})) or {}
-        done = bool(payload.get("done", obs.get("done", False)))
-        return obs, reward, meta, done
-
-    def reset(self, seed: int, scenario: str) -> Tuple[Optional[Dict], Optional[str]]:
-        data, err = self._post("/reset", {"seed": seed, "scenario": scenario})
-        if err:
-            return None, err
-        obs, _, _, _ = self._normalize(data)
-        return obs, None
-
-    def step(self, action_type: str) -> Tuple[Optional[Tuple], Optional[str]]:
-        data, err = self._post("/step", {"action_type": action_type})
-        if err:
-            return None, err
-        return self._normalize(data), None
-
-    def state(self) -> Tuple[Optional[Dict], Optional[str]]:
-        return self._get("/state")
+MAX_STEPS = _MAX_STEPS
 
 
-client = APIClient()
-
-# ─── Policies ─────────────────────────────────────────────────────────────────
-
-class Policy(Protocol):
-    def choose_action(self, obs: Dict) -> str:
-        ...
-
-
-class PolicyRunnerAdapter:
-    def __init__(self, policy_name: str, policy_impl: object) -> None:
-        self._policy_name = policy_name
-        self._policy_impl = policy_impl
-
-    def choose_action(self, obs: Dict) -> str:
-        observation = _obs_to_observation(obs)
-        if self._policy_name == "heuristic":
-            action = self._policy_impl(observation)
-        else:
-            action = self._policy_impl.choose_action(observation)
-        return action.action_type.value
-
-
-def _obs_to_observation(obs: Dict) -> Observation:
-    return Observation(
-        provider_a_status=float(obs.get("provider_a_status", 0.0) or 0.0),
-        provider_b_status=float(obs.get("provider_b_status", 0.0) or 0.0),
-        provider_c_status=float(obs.get("provider_c_status", 0.0) or 0.0),
-        budget_remaining=float(obs.get("budget_remaining", 0.0) or 0.0),
-        queue_backlog=float(obs.get("queue_backlog", 0.0) or 0.0),
-        system_latency=float(obs.get("system_latency", 0.0) or 0.0),
-        step_count=float(obs.get("step_count", 0.0) or 0.0),
-        done=bool(obs.get("done", False)),
-        reward=float(obs.get("reward", 0.0) or 0.0),
-        metadata=obs.get("metadata", {}) or {},
-    )
-
-
-def _format_policy_error(policy_name: str, error: str) -> str:
-    if policy_name == "llm" and "API_BASE_URL" in error and "API_KEY" in error:
-        return (
-            "LLM auto-play is not enabled in this hosted Space. "
-            "To try it, duplicate this Space to your own account and set "
-            "API_BASE_URL, API_KEY, and optionally MODEL_NAME in that copy's Space settings."
-        )
-    return error
-
-
-def get_policy_runner(policy_name: str) -> Tuple[Optional[Policy], Optional[str]]:
-    try:
-        return PolicyRunnerAdapter(policy_name, select_policy(policy_name)), None
-    except Exception as exc:
-        return None, _format_policy_error(policy_name, str(exc))
-
-# ─── Grade Computation ────────────────────────────────────────────────────────
-
-def compute_grade(history: List[Dict]) -> Dict[str, float]:
-    canonical_history = [
-        {
-            "step": h.get("step", 0),
-            "action_type": h.get("action", "shed_load"),
-            "request_succeeded": h.get("succeeded", False),
-            "cost": h.get("cost", 0.0),
-            "latency_ms": h.get("latency_ms", 0.0),
-            "reward": h.get("reward", 0.0),
-            "sla_ceiling_ms": h.get("sla_ceiling_ms", 500.0),
-            "initial_budget": h.get("initial_budget", 1.0),
-            "degradation_start_step": h.get("degradation_start_step", 999),
-            "secondary_degradation_start_step": h.get("secondary_degradation_start_step"),
-        }
-        for h in history
-    ]
-    return grade_episode(canonical_history)
-
-# ─── HTML Renderers ───────────────────────────────────────────────────────────
-
-_TABLE_STYLE = "width:100%;border-collapse:collapse;font-size:13px;background:#ffffff;color:#111827"
-_HEADER_ROW_STYLE = "background:#fafafa"
-_HEADER_CELL_STYLE = "border:1px solid #eee;padding:6px;color:#111827"
-_CELL_STYLE = "border:1px solid #eee;padding:6px;text-align:center;color:#111827;background:#ffffff"
-_ACTION_CELL_STYLE = "border:1px solid #eee;padding:6px;font-weight:600;color:#111827"
-
-def _join(parts: List[str]) -> str:
-    return "".join(parts)
-
-def _th(value: str) -> str:
-    return f"<th style='{_HEADER_CELL_STYLE}'>{value}</th>"
-
-def _td(value: str, style: str, colspan: Optional[int] = None) -> str:
-    span = f" colspan='{colspan}'" if colspan else ""
-    return f"<td{span} style='{style}'>{value}</td>"
-
-def _tr(cells: List[str], style: Optional[str] = None) -> str:
-    style_attr = f" style='{style}'" if style else ""
-    return f"<tr{style_attr}>" + "".join(cells) + "</tr>"
-
-def _table(head: str, body: str) -> str:
-    return f"<table style='{_TABLE_STYLE}'><thead>{head}</thead><tbody>{body}</tbody></table>"
-
-def _bar(value: float, label: str, color: str, show_dollar: bool = False) -> str:
-    pct = max(0, min(100, int(value * 100)))
-    display = f"${value:.2f}" if show_dollar else f"{pct}%"
-    return (
-        f'<div style="margin:5px 0;color:#111827">'
-        f'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px;color:#111827">'
-        f'<b>{label}</b><span>{display}</span></div>'
-        f'<div style="background:#e0e0e0;border-radius:5px;height:20px">'
-        f'<div style="width:{pct}%;background:{color};border-radius:5px;height:100%;'
-        f'transition:width 0.3s ease"></div></div></div>'
-    )
-
-def _budget_color(remaining: float) -> str:
-    if remaining > 0.5:  return "#27ae60"
-    if remaining > 0.2:  return "#f39c12"
-    return "#e74c3c"
-
-def render_providers(obs: Dict) -> str:
-    return _join([
-        _bar(obs.get("provider_a_status", 0), "Provider A", "#27ae60"),
-        _bar(obs.get("provider_b_status", 0), "Provider B", "#e67e22"),
-        _bar(obs.get("provider_c_status", 0), "Provider C", "#e74c3c"),
-    ])
-
-def render_budget(obs: Dict) -> str:
-    b = obs.get("budget_remaining", 1.0)
-    return _bar(b, "Budget Remaining", _budget_color(b))
-
-def render_grader(grade: Dict) -> str:
-    o = grade["overall_score"]
-    color = "#27ae60" if o > 0.7 else "#f39c12" if o > 0.4 else "#e74c3c"
-    return (
-        f'<div style="text-align:center;font-size:28px;font-weight:bold;'
-        f'color:{color};margin-top:12px;padding:8px;border-radius:8px;'
-        f'background:rgba(0,0,0,0.04)">Overall Score: {o:.1%}</div>'
-    )
-
-def _GRADER_PENDING() -> str:
-    return "<div style='color:#aaa;font-style:italic'>Shown when episode completes.</div>"
-
-def _PROVIDER_EMPTY() -> str:
-    return "<div style='color:#aaa;font-style:italic'>Start an episode to see provider health.</div>"
-
-# ─── State Helpers ────────────────────────────────────────────────────────────
-
-def fresh_state() -> Dict:
-    return {"obs": {}, "history": [], "cumulative_reward": 0.0, "step": 0, "done": False}
-
-
-def apply_step_result(state: Dict, action: str, result: Tuple[Dict, float, Dict, bool]) -> Tuple[Dict, Dict, float, bool]:
-    obs, reward, meta, done = result
-    state["step"] += 1
-    state["cumulative_reward"] += reward
-    state["history"].append(record_step(state["step"], action, obs, reward, meta))
-    state["obs"] = obs
-    state["done"] = done
-    return state, obs, reward, done
-
-
-def format_step_status(prefix: str, step: int, action: str, reward: float, done: bool) -> str:
-    return (
-        f"{prefix} Step {step} · {action} → {reward:+.3f}"
-        + (" · DONE" if done else "")
-    )
-
-
-POLICY_META = {
-    "heuristic": {"label": "Heuristic", "icon": "⚡"},
-    "llm": {"label": "LLM", "icon": "🤖"},
-}
-
-
-def reset_episode(scenario: str, seed: float) -> Tuple[Dict, Optional[Dict], Optional[str]]:
-    obs, err = client.reset(int(seed), scenario)
-    if err:
-        return fresh_state(), None, err
-    state = fresh_state()
-    state["obs"] = obs
-    return state, obs, None
-
-
-def step_episode(action: str, state: Dict) -> Tuple[Optional[Tuple[Dict, Dict, float, bool]], Optional[str]]:
-    result, err = client.step(action)
-    if err:
-        return None, err
-    return apply_step_result(state, action, result), None
-
-def record_step(step: int, action: str, obs: Dict, reward: float, meta: Dict) -> Dict:
-    return {
-        "step": step,
-        "action": action,
-        "health_a": obs.get("provider_a_status", 0),
-        "health_b": obs.get("provider_b_status", 0),
-        "health_c": obs.get("provider_c_status", 0),
-        "budget": obs.get("budget_remaining", 0),
-        "reward": reward,
-        "succeeded": meta.get("request_succeeded", False),
-        "cost": meta.get("cost", 0.0),
-        "latency_ms": meta.get("latency_ms", 0.0),
-        "sla_ceiling_ms": meta.get("sla_ceiling_ms", 500.0),
-        "initial_budget": meta.get("initial_budget", 1.0),
-        "degradation_start_step": meta.get("degradation_start_step", 999),
-        "secondary_degradation_start_step": meta.get("secondary_degradation_start_step"),
-    }
-
-_ACTION_COLORS = {
-    "route_to_a": "#d5f5e3",
-    "route_to_b": "#fef9e7",
-    "route_to_c": "#fadbd8",
-    "shed_load":  "#f2f3f4",
-}
-
-def render_history_table(history: List[Dict]) -> str:
-    headers = ["Step", "Action", "Health A", "Health B", "Health C", "Budget", "Reward"]
-    head = _tr([_th(h) for h in headers], style=_HEADER_ROW_STYLE)
-    if not history:
-        body = _tr([
-            _td("No steps yet.", "padding:8px;color:#888;text-align:center", colspan=len(headers))
-        ])
-    else:
-        rows = []
-        for h in history:
-            action = h["action"]
-            action_color = _ACTION_COLORS.get(action, "#f2f3f4")
-            rows.append(_tr([
-                _td(str(h["step"]), _CELL_STYLE),
-                _td(action, f"{_ACTION_CELL_STYLE};background:{action_color}"),
-                _td(f"{h['health_a']:.2f}", _CELL_STYLE),
-                _td(f"{h['health_b']:.2f}", _CELL_STYLE),
-                _td(f"{h['health_c']:.2f}", _CELL_STYLE),
-                _td(f"{h['budget']:.2f}", _CELL_STYLE),
-                _td(f"{h['reward']:+.3f}", _CELL_STYLE),
-            ]))
-        body = "".join(rows)
-    return _table(head, body)
+# Compatibility: preserve module-level MAX_STEPS for callers.
 
 # ─── UI Build ─────────────────────────────────────────────────────────────────
 
 def build_app() -> gr.Blocks:
 
-    with gr.Blocks(title="Budget Router Dashboard", theme=THEME, css=LIGHT_CSS) as demo:
+    def _normalize_seed(seed: object, default: int = 42) -> int:
+        if seed is None:
+            return default
+        try:
+            val = float(seed)  # type: ignore[arg-type]
+        except Exception:
+            return default
+        if math.isnan(val) or math.isinf(val):
+            return default
+        try:
+            return int(val)
+        except Exception:
+            return default
 
-        episode_state = gr.State(fresh_state())
+    with gr.Blocks(title="Budget Router — Policy Comparison", theme=THEME, css=LIGHT_CSS) as demo:
+
+        left_state = gr.State(fresh_side_state())
+        right_state = gr.State(fresh_side_state())
+        run_state = gr.State({"running": False, "scenario": "easy", "seed": 42, "step": 0})
 
         gr.Markdown(
-            "# ⚙️ Budget Router — Live Episode Dashboard\n"
-            "_3-provider LLM routing simulator · 20 steps · Budget & reliability constraints_"
+            "# Budget Router — Policy Comparison\n"
+            "_Select 2 policies · start episode · step or fast-forward · compare outcomes_"
         )
 
         with gr.Row():
-            # ── LEFT: Controls ────────────────────────────────────────────────
-            with gr.Column(scale=1, min_width=240):
-                gr.Markdown("### Controls")
-                scenario_sel = gr.Radio(SCENARIOS, value="easy", label="Scenario")
-                gr.Markdown("*Select scenario above before running auto-play*")
-                seed_inp     = gr.Number(value=42, label="Seed", precision=0)
-                start_btn    = gr.Button("▶ Start Episode", variant="primary")
+            with gr.Column(scale=1):
+                gr.Markdown("## Policy A")
+                left_policy = gr.Dropdown(choices=POLICY_CHOICES, value=None, label="Select policy")
+                left_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                left_providers = gr.HTML(_PROVIDER_EMPTY())
+                left_budget = gr.HTML("")
+                left_kpis = gr.HTML(
+                    _kpi_grid(
+                        [
+                            ("Step", "—"),
+                            ("Last action", "—"),
+                            ("Latency (ms)", "—"),
+                            ("Budget remaining", "—"),
+                            ("Reward", "—"),
+                            ("Adaptation", "—"),
+                        ]
+                    )
+                )
+                left_badges = gr.HTML("")
+                left_summary = gr.HTML(
+                    _kpi_grid(
+                        [
+                            ("Failed %", "—"),
+                            ("SLA breach %", "—"),
+                            ("Avg latency (ms)", "—"),
+                        ]
+                    )
+                )
 
-                gr.Markdown("### Action")
-                action_sel = gr.Radio(ACTION_CHOICES, value="route_to_a", label="Select Action")
-                step_btn   = gr.Button("→ Take Step", variant="secondary")
-                auto_btn   = gr.Button("⚡ Run Heuristic Auto-Play")
-                llm_btn    = gr.Button("🤖 Run LLM Auto-Play")
+            with gr.Column(scale=1):
+                gr.Markdown("## Policy B")
+                right_policy = gr.Dropdown(choices=POLICY_CHOICES, value=None, label="Select policy")
+                right_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                right_providers = gr.HTML(_PROVIDER_EMPTY())
+                right_budget = gr.HTML("")
+                right_kpis = gr.HTML(
+                    _kpi_grid(
+                        [
+                            ("Step", "—"),
+                            ("Last action", "—"),
+                            ("Latency (ms)", "—"),
+                            ("Budget remaining", "—"),
+                            ("Reward", "—"),
+                            ("Adaptation", "—"),
+                        ]
+                    )
+                )
+                right_badges = gr.HTML("")
+                right_summary = gr.HTML(
+                    _kpi_grid(
+                        [
+                            ("Failed %", "—"),
+                            ("SLA breach %", "—"),
+                            ("Avg latency (ms)", "—"),
+                        ]
+                    )
+                )
 
-                status_box = gr.Textbox(label="Status", interactive=False, lines=2)
-
-            # ── RIGHT: Live State ─────────────────────────────────────────────
+        with gr.Row():
             with gr.Column(scale=2):
-                gr.Markdown("### Live State")
-                provider_html = gr.HTML(_PROVIDER_EMPTY())
-                budget_html   = gr.HTML()
-
+                gr.Markdown("### Episode Controls")
+                scenario_sel = gr.Radio(SCENARIOS, value="easy", label="Scenario")
+                seed_inp = gr.Number(value=42, label="Seed", precision=0)
+                start_btn = gr.Button("▶ Start Episode", variant="primary", interactive=False)
                 with gr.Row():
-                    step_md    = gr.Markdown("**Step:** — / 20")
-                    action_md  = gr.Markdown("**Last:** —")
-                    reward_md  = gr.Markdown("**Cumulative:** 0.000")
+                    step_btn = gr.Button("→ Step", variant="secondary", interactive=False)
+                    fast_btn = gr.Button("⚡ Fast-forward", interactive=False)
+                    finish_btn = gr.Button("⏩ Finish Episode", interactive=False)
 
-        # ── BOTTOM: History ───────────────────────────────────────────────────
-        gr.Markdown("### Episode History")
-        history_tbl = gr.HTML(render_history_table([]))
+        gr.Markdown("### Grader score (comparison)")
+        grader_plot = gr.Plot()
 
-        # ── GRADER: shown at episode end ──────────────────────────────────────
-        gr.Markdown("### Episode Grade")
-        grader_html = gr.HTML(_GRADER_PENDING())
+        gr.Markdown("### Budget Consumed (comparison)")
+        budget_plot = gr.Plot()
 
-        # ─── Output spec (shared by all 3 buttons) ────────────────────────────
-        OUTPUTS = [
-            episode_state,  # 0
-            status_box,     # 1
-            provider_html,  # 2
-            budget_html,    # 3
-            step_md,        # 4
-            action_md,      # 5
-            reward_md,      # 6
-            history_tbl,    # 7
-            grader_html,    # 8
-        ]
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Markdown("### Step History — Policy A")
+                left_history_tbl = gr.HTML(render_history_table_compare([]))
+            with gr.Column(scale=1):
+                gr.Markdown("### Step History — Policy B")
+                right_history_tbl = gr.HTML(render_history_table_compare([]))
 
-        def _live_tuple(state: Dict, status: str,
-                        obs: Optional[Dict] = None,
-                        action: Optional[str] = None,
-                        reward: Optional[float] = None) -> tuple:
-            """Build the 9-element output tuple from current state."""
-            obs = obs or state.get("obs", {})
-            grade_html = _GRADER_PENDING()
-            if state.get("done") and state.get("history"):
-                grade_html = render_grader(compute_grade(state["history"]))
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Markdown("### Episode Grade — Policy A")
+                left_grade = gr.HTML(_GRADER_PENDING())
+            with gr.Column(scale=1):
+                gr.Markdown("### Episode Grade — Policy B")
+                right_grade = gr.HTML(_GRADER_PENDING())
 
-            sign = "+" if (reward or 0) >= 0 else ""
-            last = f"**Last:** {action} → {sign}{reward:.3f}" if action else "**Last:** —"
+        gr.Markdown("### Incident Timeline")
+        incidents_html = gr.HTML(render_incident_timeline("easy"))
 
+        def _render_side(side: Dict, run: Dict, scenario_name: str) -> Tuple[str, str, str, str, str, str, str, str]:
+            return render_side_panel(side, run, scenario_name)
+
+        def _render_all(ls: Dict, rs: Dict, run: Dict) -> tuple:
+            scenario_name = str(run.get("scenario", "easy") or "easy")
+            l_out = _render_side(ls, run, scenario_name)
+            r_out = _render_side(rs, run, scenario_name)
+            plot = render_grader_plot(ls.get("history", []) or [], rs.get("history", []) or [])
+            bplot = render_budget_consumed_plot(ls.get("history", []) or [], rs.get("history", []) or [])
+            incidents = render_incident_timeline(scenario_name)
+
+            running = bool(run.get("running", False))
+            btn_update = gr.update(interactive=running)
+            config_update = gr.update(interactive=(not running))
             return (
-                state,
-                status,
-                render_providers(obs) if obs else _PROVIDER_EMPTY(),
-                render_budget(obs) if obs else "",
-                f"**Step:** {state['step']} / {MAX_STEPS}",
-                last,
-                f"**Cumulative:** {state['cumulative_reward']:.3f}",
-                render_history_table(state["history"]),
-                grade_html,
+                ls,
+                rs,
+                run,
+                l_out[0],
+                l_out[1],
+                l_out[2],
+                l_out[3],
+                l_out[4],
+                l_out[5],
+                r_out[0],
+                r_out[1],
+                r_out[2],
+                r_out[3],
+                r_out[4],
+                r_out[5],
+                l_out[6],
+                r_out[6],
+                l_out[7],
+                r_out[7],
+                plot,
+                bplot,
+                incidents,
+                config_update,
+                config_update,
+                config_update,
+                config_update,
+                config_update,
+                btn_update,
+                btn_update,
+                btn_update,
             )
 
-        # ─── Reset handler ────────────────────────────────────────────────────
-        def do_reset(scenario: str, seed: float, _state: Dict) -> tuple:
-            state, obs, err = reset_episode(scenario, seed)
-            if err:
-                return _live_tuple(state, f"❌ Reset failed: {err}")
-            return _live_tuple(state, f"✅ Started · scenario={scenario} seed={int(seed)}", obs=obs)
+        OUTPUTS = [
+            left_state,
+            right_state,
+            run_state,
+            left_status,
+            left_providers,
+            left_budget,
+            left_kpis,
+            left_badges,
+            left_summary,
+            right_status,
+            right_providers,
+            right_budget,
+            right_kpis,
+            right_badges,
+            right_summary,
+            left_history_tbl,
+            right_history_tbl,
+            left_grade,
+            right_grade,
+            grader_plot,
+            budget_plot,
+            incidents_html,
+            left_policy,
+            right_policy,
+            scenario_sel,
+            seed_inp,
+            start_btn,
+            step_btn,
+            fast_btn,
+            finish_btn,
+        ]
 
-        # ─── Manual step handler ──────────────────────────────────────────────
-        def do_step(action: str, state: Dict) -> tuple:
-            if state.get("done"):
-                return _live_tuple(state, "⚠️ Episode done — start a new one.")
-            if not state.get("obs"):
-                return _live_tuple(state, "⚠️ No active episode — click Start first.")
+        def _update_start_enabled(p1: Optional[str], p2: Optional[str], run: Dict):
+            running = bool((run or {}).get("running", False))
+            ok = (bool(p1) and bool(p2)) and (not running)
+            return gr.update(interactive=ok)
 
-            step_result, err = step_episode(action, state)
-            if err:
-                return _live_tuple(state, f"❌ Step failed: {err}")
+        left_policy.change(_update_start_enabled, inputs=[left_policy, right_policy, run_state], outputs=[start_btn])
+        right_policy.change(_update_start_enabled, inputs=[left_policy, right_policy, run_state], outputs=[start_btn])
 
-            state, obs, reward, done = step_result
+        scenario_sel.change(lambda s: render_incident_timeline(s), inputs=[scenario_sel], outputs=[incidents_html])
 
-            status = format_step_status("✅", state["step"], action, reward, done)
-            return _live_tuple(state, status, obs=obs, action=action, reward=reward)
+        def do_start(p1: str, p2: str, scenario: str, seed: Optional[float], _ls: Dict, _rs: Dict, _run: Dict):
+            ls = fresh_side_state()
+            rs = fresh_side_state()
 
-        def run_policy_episode(scenario: str, seed: float, policy_name: str):
-            policy_runner, policy_err = get_policy_runner(policy_name)
-            if policy_err:
-                state = fresh_state()
-                yield _live_tuple(state, f"❌ {policy_err}")
+            seed_int = _normalize_seed(seed, default=42)
+
+            if not p1 or not p2:
+                run = {"running": False, "scenario": scenario, "seed": seed_int, "step": 0}
+                ls["status"] = "Select both policies to start."
+                rs["status"] = "Select both policies to start."
+                return _render_all(ls, rs, run)
+
+            runner_l, err_l = get_policy_runner(p1)
+            runner_r, err_r = get_policy_runner(p2)
+            if err_l or err_r or runner_l is None or runner_r is None:
+                ls["status"] = f"❌ {err_l}" if err_l else ""
+                rs["status"] = f"❌ {err_r}" if err_r else ""
+                run = {"running": False, "scenario": scenario, "seed": seed_int, "step": 0}
+                return _render_all(ls, rs, run)
+
+            env_l = BudgetRouterEnv()
+            env_r = BudgetRouterEnv()
+            obs_l = env_l.reset(seed=seed_int, scenario=scenario)
+            obs_r = env_r.reset(seed=seed_int, scenario=scenario)
+            try:
+                runner_l.reset(scenario)
+            except Exception:
+                pass
+            try:
+                runner_r.reset(scenario)
+            except Exception:
+                pass
+
+            ls.update(
+                {
+                    "env": env_l,
+                    "policy_name": p1,
+                    "policy_runner": runner_l,
+                    "obs": _observation_to_dict(obs_l),
+                    "status": f"✅ Running · {p1}",
+                }
+            )
+            rs.update(
+                {
+                    "env": env_r,
+                    "policy_name": p2,
+                    "policy_runner": runner_r,
+                    "obs": _observation_to_dict(obs_r),
+                    "status": f"✅ Running · {p2}",
+                }
+            )
+            run = {"running": True, "scenario": scenario, "seed": seed_int, "step": 0}
+            return _render_all(ls, rs, run)
+
+        def _apply_local_step(side: Dict, scenario_name: str, global_step: int) -> Dict:
+            if side.get("done"):
+                return side
+            env = side.get("env")
+            runner = side.get("policy_runner")
+            if env is None or runner is None:
+                side["done"] = True
+                side["status"] = "❌ Not initialized"
+                return side
+            try:
+                action_str = runner.choose_action(side.get("obs", {}) or {})
+            except Exception as exc:
+                side["done"] = True
+                side["status"] = f"❌ Policy error: {exc}"
+                return side
+
+            obs_obj = env.step(Action(action_type=ActionType(action_str)))
+            obs = _observation_to_dict(obs_obj)
+            reward = float(obs.get("reward", 0.0) or 0.0)
+            meta = dict(obs.get("metadata", {}) or {})
+            done = bool(obs.get("done", False))
+            side["history"].append(record_step(global_step, action_str, obs, reward, meta))
+            side["obs"] = obs
+            side["cumulative_reward"] = float(side.get("cumulative_reward", 0.0) or 0.0) + reward
+            side["done"] = done
+            side["status"] = "✅ Done" if done else str(side.get("status", ""))
+            return side
+
+        def do_step(ls: Dict, rs: Dict, run: Dict):
+            if not bool(run.get("running", False)):
+                return _render_all(ls, rs, run)
+            if int(run.get("step", 0) or 0) >= MAX_STEPS:
+                run["running"] = False
+                return _render_all(ls, rs, run)
+
+            next_step = int(run.get("step", 0) or 0) + 1
+            scenario = str(run.get("scenario", "easy") or "easy")
+
+            ls = _apply_local_step(ls, scenario, next_step)
+            rs = _apply_local_step(rs, scenario, next_step)
+            run["step"] = next_step
+
+            if next_step >= MAX_STEPS or (ls.get("done") and rs.get("done")):
+                run["running"] = False
+            return _render_all(ls, rs, run)
+
+        def _stream_to_end(ls: Dict, rs: Dict, run: Dict):
+            if not bool(run.get("running", False)):
+                yield _render_all(ls, rs, run)
                 return
 
-            state, obs, err = reset_episode(scenario, seed)
-            if err:
-                yield _live_tuple(state, f"❌ Reset failed: {err}")
-                return
-            meta = POLICY_META.get(policy_name, {"label": policy_name, "icon": "▶"})
-            label = meta["label"]
-            icon = meta["icon"]
-            yield _live_tuple(state, f"▶ {label} simulation · scenario={scenario} seed={int(seed)}", obs=obs)
+            frozen = _render_all(ls, rs, run)
+            frozen_grader_plot = frozen[19]
+            frozen_budget_plot = frozen[20]
 
-            while not state["done"] and state["step"] < MAX_STEPS:
-                time.sleep(AUTO_PLAY_DELAY)
-                try:
-                    action = policy_runner.choose_action(obs) if policy_runner else "shed_load"
-                except Exception as exc:
-                    yield _live_tuple(state, f"❌ {label} policy error: {exc}")
-                    return
-                step_result, err = step_episode(action, state)
-                if err:
-                    yield _live_tuple(state, f"❌ Step error: {err}")
-                    return
+            while bool(run.get("running", False)) and int(run.get("step", 0) or 0) < MAX_STEPS:
+                out = do_step(ls, rs, run)
+                ls, rs, run = out[0], out[1], out[2]
+                out_list = list(out)
+                out_list[19] = frozen_grader_plot
+                out_list[20] = frozen_budget_plot
+                yield tuple(out_list)
+                time.sleep(0.12)
+                if not bool(run.get("running", False)):
+                    break
 
-                state, obs, reward, done = step_result
+            yield _render_all(ls, rs, run)
 
-                status = format_step_status(icon, state["step"], action, reward, done)
-                yield _live_tuple(state, status, obs=obs, action=action, reward=reward)
+        def do_fast_forward(ls: Dict, rs: Dict, run: Dict):
+            yield from _stream_to_end(ls, rs, run)
 
-        # ─── Auto-play handlers (streaming generators) ───────────────────────
-        def do_auto_play(scenario: str, seed: float, _state: Dict):
-            yield from run_policy_episode(scenario, seed, "heuristic")
+        def do_finish(ls: Dict, rs: Dict, run: Dict):
+            yield from _stream_to_end(ls, rs, run)
 
-        def do_llm_play(scenario: str, seed: float, _state: Dict):
-            yield from run_policy_episode(scenario, seed, "llm")
-
-        # ─── Wire buttons ─────────────────────────────────────────────────────
-        start_btn.click(do_reset,    inputs=[scenario_sel, seed_inp, episode_state], outputs=OUTPUTS)
-        step_btn.click( do_step,     inputs=[action_sel,   episode_state],           outputs=OUTPUTS)
-        auto_btn.click( do_auto_play,inputs=[scenario_sel, seed_inp, episode_state], outputs=OUTPUTS)
-        llm_btn.click(  do_llm_play, inputs=[scenario_sel, seed_inp, episode_state], outputs=OUTPUTS)
+        start_btn.click(do_start, inputs=[left_policy, right_policy, scenario_sel, seed_inp, left_state, right_state, run_state], outputs=OUTPUTS)
+        step_btn.click(do_step, inputs=[left_state, right_state, run_state], outputs=OUTPUTS)
+        fast_btn.click(do_fast_forward, inputs=[left_state, right_state, run_state], outputs=OUTPUTS)
+        finish_btn.click(do_finish, inputs=[left_state, right_state, run_state], outputs=OUTPUTS)
 
     return demo
 

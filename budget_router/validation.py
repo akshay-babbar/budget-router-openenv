@@ -416,7 +416,7 @@ def main() -> None:
     run_manual_trace(seed=42, scenario_name="medium")
     run_manual_trace(seed=42, scenario_name="hard_multi")
 
-    # Hard assertions
+    # Hard assertionschoose_action
     assert_all_checks(dev_results, heldout_results)
 
 
