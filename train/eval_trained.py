@@ -124,13 +124,21 @@ def main():
     args = parser.parse_args()
 
     model_path = args.model_path
-    if not os.path.exists(model_path):
-        print(f"❌ Trained model not found at {MODEL_PATH}")
-        print("   Run train/learn_experiment.py first.")
+    is_hub_id = "/" in model_path and not os.path.exists(model_path)
+    if not os.path.exists(model_path) and not is_hub_id:
+        print(f"❌ Trained model not found at {model_path}")
+        print("   Pass a local model directory or a Hugging Face Hub model id.")
         sys.exit(1)
 
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
-    dtype = torch.bfloat16 if device == "mps" else torch.float32
+    if torch.cuda.is_available():
+        device = "cuda"
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    elif torch.backends.mps.is_available():
+        device = "mps"
+        dtype = torch.bfloat16
+    else:
+        device = "cpu"
+        dtype = torch.float32
 
     print(f"Loading trained model from {model_path} ...")
     model = AutoModelForCausalLM.from_pretrained(model_path, dtype=dtype)
