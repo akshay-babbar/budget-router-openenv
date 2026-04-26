@@ -14,6 +14,7 @@ pinned: false
 Budget Router is an OpenEnv-compliant RL environment where an agent routes requests to one of three providers (A/B/C) or sheds load under a tight **cost–reliability–SLA** trade-off. Providers degrade non-stationarily within an episode; the agent observes only a noisy windowed success signal (rolling success rate), not true internal health.
 
 [![HF Space](https://img.shields.io/badge/🤗-Live%20Demo-yellow)](https://huggingface.co/spaces/akshay4/budget-router-openenv)
+[![Demo Video](https://img.shields.io/badge/YouTube-Demo-red)](https://youtu.be/Z1A2zND_x70)
 
 ## TL;DR
 
@@ -73,11 +74,9 @@ uv run server
 
 Then open `http://127.0.0.1:8000/web` for the Gradio dashboard.
 
-To **reproduce or regenerate** the evaluation numbers, traces, PPO workflow, and optional GRPO checks, follow the command checklist in [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) (companion to the optional `<details>` blocks below).
+**REPRODUCIBLE RESULTS: use [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) as the source-of-truth command checklist for evaluation numbers, traces, PPO workflow, and optional GRPO/SFT checks.**
 
-
-
-To **reproduce or regenerate** the evaluation numbers, traces, PPO workflow, and optional GRPO checks, follow the command checklist in [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) (companion to the optional `<details>` blocks below).
+**IF THE HUGGING FACE SPACE OR HF JOBS CODE PATH FAILS, RUN THE GITHUB/LOCAL CODE DIRECTLY FROM [`akshay-babbar/budget-router-openenv`](https://github.com/akshay-babbar/budget-router-openenv). THE GITHUB CODE IS THE MOST UP-TO-DATE VERSION.**
 
 
 ## Benchmark results

@@ -10,6 +10,8 @@ Budget Router is an OpenEnv-compliant reinforcement learning environment where a
 
 The interesting case is `Hard_Multi`: Provider A degrades from the beginning, and Provider B cascades later in the episode. This creates a two-phase incident. A naive router can look reasonable early and still fail late because it spent too much budget before the real cascade arrived.
 
+Demo video: [Budget Router walkthrough](https://youtu.be/Z1A2zND_x70).
+
 This is a small environment, but it captures a real infrastructure question:
 
 > Can an agent learn budget-aware reliability behavior under partial observability and non-stationary provider degradation?
@@ -199,6 +201,10 @@ That combination is rare in hackathon environments. Many environments are easy t
 ## Reproducibility
 
 The repo is structured so judges can inspect both aggregate results and exact behavior.
+
+**REPRODUCIBLE RESULTS: use [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) as the source-of-truth command checklist.**
+
+**IF THE HUGGING FACE SPACE OR HF JOBS CODE PATH FAILS, RUN THE GITHUB/LOCAL CODE DIRECTLY FROM [`akshay-babbar/budget-router-openenv`](https://github.com/akshay-babbar/budget-router-openenv). THE GITHUB CODE IS THE MOST UP-TO-DATE VERSION.**
 
 Key artifacts:
 
