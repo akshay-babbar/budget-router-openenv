@@ -17,10 +17,10 @@ RUN if ! command -v uv >/dev/null 2>&1; then \
     fi
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-install-project --no-editable
+    uv sync --extra training --no-install-project --no-editable
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-editable
+    uv sync --extra training --no-editable
 
 FROM ${BASE_IMAGE}
 
