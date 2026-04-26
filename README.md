@@ -67,11 +67,13 @@ export MODEL_NAME="<model_id>"  # optional (e.g. Qwen/Qwen2.5-72B-Instruct)
 
 
 ```bash
-uv sync
+uv sync --extra training
 uv run server
 ```
 
 Then open `http://127.0.0.1:8000/web` for the Gradio dashboard.
+
+To **reproduce or regenerate** the evaluation numbers, traces, PPO workflow, and optional GRPO checks, follow the command checklist in [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) (companion to the optional `<details>` blocks below).
 
 
 

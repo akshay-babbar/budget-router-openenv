@@ -1,5 +1,11 @@
 import pytest
 
+# GRPO tests import train/learn_experiment.py, which loads torch, datasets, peft,
+# transformers, trl at module import. Those live under `--extra grpo` (torch alone
+# may exist via `--extra training`, which is not enough).
+for _grpo_mod in ("torch", "datasets", "peft", "transformers", "trl"):
+    pytest.importorskip(_grpo_mod)
+
 from budget_router.reward import grade_episode
 from train.grpo_env import BudgetRouterGRPOEnv
 from train.learn_experiment import build_dataset, build_system_prompt, reward_func, summarize_training_rollout

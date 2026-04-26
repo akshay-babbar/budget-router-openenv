@@ -35,6 +35,28 @@ DEFAULT_PPO_MODELS = {
     "easy": Path("trained_models/ppo_easy_50k.zip"),
     "hard_multi": Path("trained_models/ppo_hard_multi_100k.zip"),
 }
+# Matches train/gym_wrapper.BudgetRouterGymEnv action order (Discrete 0..3).
+_PPO_ACTION_NAMES = ("route_to_a", "route_to_b", "route_to_c", "shed_load")
+
+
+def _echo_step_progress(
+    *,
+    policy_label: str,
+    step: int,
+    action: str,
+    reward: float,
+    cumulative: float,
+    done: bool,
+    llm_error: Optional[str] = None,
+    verbose: bool,
+) -> None:
+    if not verbose:
+        return
+    err = f" llm_error={llm_error}" if llm_error else ""
+    typer.echo(
+        f"[trace] policy={policy_label} step={step} action={action} "
+        f"reward={reward:+.3f} cum={cumulative:+.3f} done={done}{err}"
+    )
 
 def _visible_observation_row(obs: Observation) -> Dict[str, float]:
     """Public observation values available to the policy before it acts."""
@@ -97,17 +119,35 @@ def _cumulative_step_rows(
     return rows
 
 
-def _run_heuristic(task_cfg: TaskConfig, seed: int) -> tuple[BudgetRouterEnv, List[Dict[str, float]]]:
+def _run_heuristic(
+    task_cfg: TaskConfig, seed: int, *, verbose: bool = False
+) -> tuple[BudgetRouterEnv, List[Dict[str, float]]]:
     env = BudgetRouterEnv()
     obs = env.reset(seed=seed, scenario=task_cfg)
     visible_observations = []
+    cumulative = 0.0
     while not obs.done:
         visible_observations.append(_visible_observation_row(obs))
-        obs = env.step(heuristic_baseline_policy(obs))
+        action = heuristic_baseline_policy(obs)
+        action_str = action.action_type.value
+        obs = env.step(action)
+        r = float(obs.reward or 0.0)
+        cumulative += r
+        _echo_step_progress(
+            policy_label="heuristic",
+            step=int(env._internal.current_step),
+            action=action_str,
+            reward=r,
+            cumulative=cumulative,
+            done=bool(obs.done),
+            verbose=verbose,
+        )
     return env, visible_observations
 
 
-def _run_llm(task_name: str, task_cfg: TaskConfig, seed: int) -> tuple[BudgetRouterEnv, List[Dict[str, float]]]:
+def _run_llm(
+    task_name: str, task_cfg: TaskConfig, seed: int, *, verbose: bool = False
+) -> tuple[BudgetRouterEnv, List[Dict[str, float]]]:
     api_key = os.getenv("API_KEY") or os.getenv("HF_TOKEN")
     api_base_url = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
     model_name = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
@@ -120,9 +160,30 @@ def _run_llm(task_name: str, task_cfg: TaskConfig, seed: int) -> tuple[BudgetRou
     env = BudgetRouterEnv()
     obs = env.reset(seed=seed, scenario=task_cfg)
     visible_observations = []
+    cumulative = 0.0
+    if verbose:
+        typer.echo(
+            f"[trace] begin policy=llm task={task_name} seed={seed} "
+            f"endpoint={api_base_url} model={model_name} "
+            f"(~{task_cfg.max_steps} sequential LLM calls; first call starting…)"
+        )
     while not obs.done:
         visible_observations.append(_visible_observation_row(obs))
-        obs = env.step(policy.choose_action(obs))
+        action = policy.choose_action(obs)
+        action_str = action.action_type.value
+        obs = env.step(action)
+        r = float(obs.reward or 0.0)
+        cumulative += r
+        _echo_step_progress(
+            policy_label="llm",
+            step=int(env._internal.current_step),
+            action=action_str,
+            reward=r,
+            cumulative=cumulative,
+            done=bool(obs.done),
+            llm_error=policy.last_error,
+            verbose=verbose,
+        )
     return env, visible_observations
 
 
@@ -140,6 +201,8 @@ def _run_ppo(
     task_cfg: TaskConfig,
     seed: int,
     model_path: Optional[Path],
+    *,
+    verbose: bool = False,
 ) -> tuple[BudgetRouterEnv, List[Dict[str, float]]]:
     # Lazy import keeps heuristic/LLM tracing available without training extras.
     try:
@@ -157,11 +220,26 @@ def _run_ppo(
     obs, _ = gym_env.reset()
     done = False
     visible_observations = []
+    cumulative = 0.0
     while not done:
         visible_observations.append(_visible_observation_row_from_array(obs))
         action_idx, _ = model.predict(obs, deterministic=True)
-        obs, _, terminated, truncated, _ = gym_env.step(int(action_idx))
+        ai = int(action_idx)
+        action_str = _PPO_ACTION_NAMES[ai] if 0 <= ai < len(_PPO_ACTION_NAMES) else str(ai)
+        obs, reward, terminated, truncated, _ = gym_env.step(ai)
+        r = float(reward)
+        cumulative += r
         done = terminated or truncated
+        inner = gym_env._env
+        _echo_step_progress(
+            policy_label="ppo",
+            step=int(inner._internal.current_step),
+            action=action_str,
+            reward=r,
+            cumulative=cumulative,
+            done=done,
+            verbose=verbose,
+        )
 
     return gym_env._env, visible_observations
 
@@ -171,6 +249,8 @@ def trace_episode(
     seed: int,
     policy_name: str,
     model_path: Optional[Path] = None,
+    *,
+    verbose: bool = False,
 ) -> Dict[str, Any]:
     """Run one episode and return step rows plus final scorer outputs."""
     if task_name not in TASK_PRESETS:
@@ -180,15 +260,18 @@ def trace_episode(
 
     task_cfg = TASK_PRESETS[task_name]
     if policy_name == "heuristic":
-        env, visible_observations = _run_heuristic(task_cfg=task_cfg, seed=seed)
+        env, visible_observations = _run_heuristic(task_cfg=task_cfg, seed=seed, verbose=verbose)
     elif policy_name == "llm":
-        env, visible_observations = _run_llm(task_name=task_name, task_cfg=task_cfg, seed=seed)
+        env, visible_observations = _run_llm(
+            task_name=task_name, task_cfg=task_cfg, seed=seed, verbose=verbose
+        )
     else:
         env, visible_observations = _run_ppo(
             task_name=task_name,
             task_cfg=task_cfg,
             seed=seed,
             model_path=model_path,
+            verbose=verbose,
         )
 
     history = env._internal.history
@@ -247,9 +330,21 @@ def main(
     policy: str = typer.Option("heuristic", help=f"Policy: {' | '.join(sorted(POLICIES))}"),
     model_path: Optional[Path] = typer.Option(None, help="PPO model path. Defaults exist for easy/hard_multi."),
     output_json: Optional[Path] = typer.Option(None, help="Optional path to save the full trace JSON."),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Print one line per env step during the episode (useful for slow LLM runs).",
+    ),
 ) -> None:
     """Run and print a single exact-seed episode trace."""
-    result = trace_episode(task_name=task, seed=seed, policy_name=policy, model_path=model_path)
+    result = trace_episode(
+        task_name=task,
+        seed=seed,
+        policy_name=policy,
+        model_path=model_path,
+        verbose=verbose,
+    )
     _print_trace(result)
 
     if output_json is not None:
