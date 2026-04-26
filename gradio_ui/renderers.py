@@ -12,6 +12,9 @@ from .config import MAX_STEPS
 
 # ─── Grade Computation ────────────────────────────────────────────────────────
 
+MISSION_SCORE_LABEL = "Benchmark Score"
+MISSION_SCORE_HELP = "Headline evaluation metric: weighted success, latency, budget, SLA, and adaptation."
+
 def compute_grade(history: List[Dict]) -> Dict[str, float]:
     canonical_history = [
         {
@@ -82,6 +85,11 @@ def _budget_color(remaining: float) -> str:
     return "#e74c3c"
 
 
+def _format_percent_precise(value: float) -> str:
+    # Show up to 4 decimal places without forcing integer rounding.
+    return f"{value * 100:.4f}".rstrip("0").rstrip(".") + "%"
+
+
 def render_providers(obs: Dict) -> str:
     return _join(
         [
@@ -101,9 +109,12 @@ def render_grader(grade: Dict) -> str:
     o = grade["overall_score"]
     color = "#27ae60" if o > 0.7 else "#f39c12" if o > 0.4 else "#e74c3c"
     return (
-        f'<div style="text-align:center;font-size:28px;font-weight:bold;'
-        f'color:{color};margin-top:12px;padding:8px;border-radius:8px;'
-        f'background:rgba(0,0,0,0.04)">Overall Score: {o:.1%}</div>'
+        f'<div style="text-align:center;margin-top:12px;padding:10px;border-radius:8px;'
+        f'background:rgba(0,0,0,0.04)">'
+        f'<div style="font-size:28px;font-weight:bold;color:{color}">'
+        f'{MISSION_SCORE_LABEL}: {_format_percent_precise(float(o))}</div>'
+        f'<div style="font-size:12px;color:#6b7280;margin-top:3px">{MISSION_SCORE_HELP}</div>'
+        f'</div>'
     )
 
 
@@ -557,7 +568,29 @@ def render_incident_timeline(scenario_name: str) -> str:
     return "<div style='display:flex;flex-direction:column;gap:6px'>" + "".join(items) + "</div>"
 
 
-def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
+def _policy_label(name: Optional[str], fallback: str) -> str:
+    text = str(name or "").strip()
+    return text if text else fallback
+
+
+def _annotation_offsets(last_left: Optional[float], last_right: Optional[float], threshold: float = 0.03) -> Tuple[int, int]:
+    if last_left is None or last_right is None:
+        return (0, 0)
+    if abs(last_left - last_right) < threshold:
+        # Keep visual ordering consistent with actual values:
+        # higher final score label stays above lower final score label.
+        if last_left >= last_right:
+            return (10, -10)
+        return (-10, 10)
+    return (0, 0)
+
+
+def render_grader_plot(
+    left_hist: List[Dict],
+    right_hist: List[Dict],
+    left_name: Optional[str] = None,
+    right_name: Optional[str] = None,
+):
     try:
         import plotly.graph_objects as go
     except Exception:
@@ -577,6 +610,9 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
 
         color_a = "#f39c12"
         color_b = "#3498db"
+        label_a = _policy_label(left_name, "Policy A")
+        label_b = _policy_label(right_name, "Policy B")
+        yshift_a, yshift_b = _annotation_offsets(y1[-1] if y1 else None, y2[-1] if y2 else None)
 
         fig = go.Figure()
         if y1:
@@ -585,18 +621,19 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
                     x=x1,
                     y=y1,
                     mode="lines",
-                    name="Policy A",
+                    name=label_a,
                     line=dict(color=color_a, width=3),
-                    hovertemplate="Step %{x}<br>Score %{y:.0%}<extra></extra>",
+                    hovertemplate="Step %{x}<br>Benchmark Score %{y:.4%}<extra></extra>",
                 )
             )
             fig.add_annotation(
                 x=x1[-1],
                 y=y1[-1],
-                text=f"{y1[-1]:.0%}",
+                text=_format_percent_precise(float(y1[-1])),
                 showarrow=False,
                 xanchor="left",
                 xshift=8,
+                yshift=yshift_a,
                 font=dict(color=color_a, size=12),
             )
         if y2:
@@ -605,24 +642,25 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
                     x=x2,
                     y=y2,
                     mode="lines",
-                    name="Policy B",
+                    name=label_b,
                     line=dict(color=color_b, width=3),
-                    hovertemplate="Step %{x}<br>Score %{y:.0%}<extra></extra>",
+                    hovertemplate="Step %{x}<br>Benchmark Score %{y:.4%}<extra></extra>",
                 )
             )
             fig.add_annotation(
                 x=x2[-1],
                 y=y2[-1],
-                text=f"{y2[-1]:.0%}",
+                text=_format_percent_precise(float(y2[-1])),
                 showarrow=False,
                 xanchor="left",
                 xshift=8,
+                yshift=yshift_b,
                 font=dict(color=color_b, size=12),
             )
 
         fig.update_layout(
             template="plotly_white",
-            title=dict(text="Overall score over steps", x=0.0, xanchor="left"),
+            title=dict(text=f"{MISSION_SCORE_LABEL} over steps", x=0.0, xanchor="left"),
             margin=dict(l=50, r=20, t=45, b=40),
             height=320,
             hovermode="x unified",
@@ -631,8 +669,8 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
         )
         fig.update_xaxes(title_text="Step", showgrid=False, zeroline=False)
         fig.update_yaxes(
-            title_text="Overall score",
-            tickformat=",.0%",
+            title_text=MISSION_SCORE_LABEL,
+            tickformat=",.2%",
             range=[0, 1],
             showgrid=True,
             gridcolor="rgba(17,24,39,0.08)",
@@ -665,12 +703,15 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
 
     color_a = "#f39c12"
     color_b = "#3498db"
+    label_a = _policy_label(left_name, "Policy A")
+    label_b = _policy_label(right_name, "Policy B")
+    yoffset_a, yoffset_b = _annotation_offsets(y1[-1] if y1 else None, y2[-1] if y2 else None)
     if y1:
-        ax.plot(x1, y1, label="Policy A", linewidth=2.2, color=color_a)
+        ax.plot(x1, y1, label=label_a, linewidth=2.2, color=color_a)
         ax.annotate(
-            f"{y1[-1]:.0%}",
+            _format_percent_precise(float(y1[-1])),
             xy=(x1[-1], y1[-1]),
-            xytext=(6, 0),
+            xytext=(6, yoffset_a),
             textcoords="offset points",
             ha="left",
             va="center",
@@ -679,11 +720,11 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
             color=color_a,
         )
     if y2:
-        ax.plot(x2, y2, label="Policy B", linewidth=2.2, color=color_b)
+        ax.plot(x2, y2, label=label_b, linewidth=2.2, color=color_b)
         ax.annotate(
-            f"{y2[-1]:.0%}",
+            _format_percent_precise(float(y2[-1])),
             xy=(x2[-1], y2[-1]),
-            xytext=(6, 0),
+            xytext=(6, yoffset_b),
             textcoords="offset points",
             ha="left",
             va="center",
@@ -693,10 +734,10 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
         )
 
     ax.set_ylim(0, 1)
-    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=0))
+    ax.yaxis.set_major_formatter(PercentFormatter(xmax=1.0, decimals=2))
     ax.set_xlabel("Step")
-    ax.set_ylabel("Overall score")
-    ax.set_title("Overall score over steps", loc="left", fontsize=11, fontweight="bold", color="#111827")
+    ax.set_ylabel(MISSION_SCORE_LABEL)
+    ax.set_title(f"{MISSION_SCORE_LABEL} over steps", loc="left", fontsize=11, fontweight="bold", color="#111827")
     fig.patch.set_facecolor("#ffffff")
     ax.set_facecolor("#ffffff")
     ax.grid(True, axis="y", alpha=0.18, linewidth=0.8)
@@ -711,7 +752,12 @@ def render_grader_plot(left_hist: List[Dict], right_hist: List[Dict]):
     return fig
 
 
-def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
+def render_reward_plot(
+    left_hist: List[Dict],
+    right_hist: List[Dict],
+    left_name: Optional[str] = None,
+    right_name: Optional[str] = None,
+):
     try:
         import plotly.graph_objects as go
     except Exception:
@@ -735,6 +781,8 @@ def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
     if go is not None:
         color_a = "#f39c12"
         color_b = "#3498db"
+        label_a = _policy_label(left_name, "Policy A")
+        label_b = _policy_label(right_name, "Policy B")
         fig = go.Figure()
 
         if y1:
@@ -743,7 +791,7 @@ def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
                     x=x1,
                     y=y1,
                     mode="lines",
-                    name="Policy A",
+                    name=label_a,
                     line=dict(color=color_a, width=3),
                     hovertemplate="Step %{x}<br>Cumulative %{y:+.2f}<extra></extra>",
                 )
@@ -764,7 +812,7 @@ def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
                     x=x2,
                     y=y2,
                     mode="lines",
-                    name="Policy B",
+                    name=label_b,
                     line=dict(color=color_b, width=3),
                     hovertemplate="Step %{x}<br>Cumulative %{y:+.2f}<extra></extra>",
                 )
@@ -818,8 +866,10 @@ def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
         ax.spines[spine].set_color("#e5e7eb")
     ax.tick_params(colors="#374151", labelsize=9)
 
+    label_a = _policy_label(left_name, "Policy A")
+    label_b = _policy_label(right_name, "Policy B")
     if y1:
-        ax.plot(x1, y1, label="Policy A", linewidth=2.2, color="#f39c12")
+        ax.plot(x1, y1, label=label_a, linewidth=2.2, color="#f39c12")
         ax.annotate(
             f"{y1[-1]:+.2f}",
             xy=(x1[-1], y1[-1]),
@@ -832,7 +882,7 @@ def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
             color="#f39c12",
         )
     if y2:
-        ax.plot(x2, y2, label="Policy B", linewidth=2.2, color="#3498db")
+        ax.plot(x2, y2, label=label_b, linewidth=2.2, color="#3498db")
         ax.annotate(
             f"{y2[-1]:+.2f}",
             xy=(x2[-1], y2[-1]),
@@ -853,7 +903,12 @@ def render_reward_plot(left_hist: List[Dict], right_hist: List[Dict]):
     return fig
 
 
-def render_budget_consumed_plot(left_hist: List[Dict], right_hist: List[Dict]):
+def render_budget_consumed_plot(
+    left_hist: List[Dict],
+    right_hist: List[Dict],
+    left_name: Optional[str] = None,
+    right_name: Optional[str] = None,
+):
     try:
         import plotly.graph_objects as go
     except Exception:
@@ -882,6 +937,8 @@ def render_budget_consumed_plot(left_hist: List[Dict], right_hist: List[Dict]):
         x1 = list(range(1, len(y1) + 1))
         x2 = list(range(1, len(y2) + 1))
 
+        label_a = _policy_label(left_name, "Policy A")
+        label_b = _policy_label(right_name, "Policy B")
         fig = go.Figure()
         if y1:
             fig.add_trace(
@@ -889,7 +946,7 @@ def render_budget_consumed_plot(left_hist: List[Dict], right_hist: List[Dict]):
                     x=x1,
                     y=y1,
                     mode="lines",
-                    name="Policy A",
+                    name=label_a,
                     line=dict(color="#f39c12", width=3),
                     hovertemplate="Step %{x}<br>Consumed $%{y:,.0f}<extra></extra>",
                 )
@@ -909,7 +966,7 @@ def render_budget_consumed_plot(left_hist: List[Dict], right_hist: List[Dict]):
                     x=x2,
                     y=y2,
                     mode="lines",
-                    name="Policy B",
+                    name=label_b,
                     line=dict(color="#3498db", width=3),
                     hovertemplate="Step %{x}<br>Consumed $%{y:,.0f}<extra></extra>",
                 )
@@ -981,8 +1038,10 @@ def render_budget_consumed_plot(left_hist: List[Dict], right_hist: List[Dict]):
     fig.patch.set_facecolor("#ffffff")
     ax.set_facecolor("#ffffff")
 
+    label_a = _policy_label(left_name, "Policy A")
+    label_b = _policy_label(right_name, "Policy B")
     if y1:
-        ax.plot(x1, y1, label="Policy A", linewidth=2.2, color="#f39c12")
+        ax.plot(x1, y1, label=label_a, linewidth=2.2, color="#f39c12")
         ax.fill_between(x1, y1, alpha=0.10, color="#f39c12")
         ax.annotate(
             f"${y1[-1]:,.0f}",
@@ -996,7 +1055,7 @@ def render_budget_consumed_plot(left_hist: List[Dict], right_hist: List[Dict]):
             color="#f39c12",
         )
     if y2:
-        ax.plot(x2, y2, label="Policy B", linewidth=2.2, color="#3498db")
+        ax.plot(x2, y2, label=label_b, linewidth=2.2, color="#3498db")
         ax.fill_between(x2, y2, alpha=0.08, color="#3498db")
         ax.annotate(
             f"${y2[-1]:,.0f}",
