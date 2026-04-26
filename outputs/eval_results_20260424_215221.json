@@ -1,0 +1,83 @@
+{
+  "metadata": {
+    "timestamp": "20260424_215221",
+    "policies": [
+      "llm"
+    ],
+    "tasks": [
+      "hard_multi"
+    ],
+    "seeds": [
+      100
+    ]
+  },
+  "summary": {
+    "hard_multi|llm": {
+      "grader_mean": 0.15,
+      "reward_mean": -10.0,
+      "success_rate": 0.0,
+      "adaptation": 0.0,
+      "n": 1
+    }
+  },
+  "episodes": [
+    {
+      "task": "hard_multi",
+      "seed": 100,
+      "policy": "llm",
+      "total_reward": -10.0,
+      "grader_score": 0.15,
+      "success_score": 0.0,
+      "budget_score": 1.0,
+      "adaptation_score": 0.0,
+      "latency_score": 0.0,
+      "sla_score": 0.0,
+      "success_rate": 0.0,
+      "steps": 20,
+      "actions": [
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load",
+        "shed_load"
+      ],
+      "rewards": [
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5,
+        -0.5
+      ]
+    }
+  ]
+}

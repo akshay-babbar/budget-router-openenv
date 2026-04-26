@@ -1,0 +1,114 @@
+====================================================================
+GRPO Learning Experiment — Budget Router
+====================================================================
+Device   : MPS
+Model    : Qwen/Qwen3-0.6B
+Steps    : 30
+Prompt   : explore
+Sampling : temperature=1.2 top_p=0.95
+Torch    : 2.11.0
+====================================================================
+
+Loading model...
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 7424.18it/s]
+/Users/akshaybabbar/Desktop/work/meta-hackathon-openenv/budget-router-openenv/train/learn_experiment.py:381: UserWarning: You are using 'environment_factory', which is an experimental feature. This API may change or be removed at any time without prior notice. Silence this warning by setting environment variable TRL_EXPERIMENTAL_SILENCE=1.
+  trainer = GRPOTrainer(
+[transformers] The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'bos_token_id': None, 'pad_token_id': 151643}.
+
+Starting experiment (Ctrl+C to stop early — partial results still printed)...
+
+  0%|          | 0/30 [00:00<?, ?it/s]/Users/akshaybabbar/Desktop/work/meta-hackathon-openenv/budget-router-openenv/.venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:775: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, device pinned memory won't be used.
+  super().__init__(loader)
+  3%|▎         | 1/30 [01:42<49:44, 102.92s/it]                                                 3%|▎         | 1/30 [01:42<49:44, 102.92s/it]  7%|▋         | 2/30 [01:46<20:43, 44.43s/it]                                                 7%|▋         | 2/30 [01:46<20:43, 44.43s/it] 10%|█         | 3/30 [01:49<11:34, 25.73s/it]                                               10%|█         | 3/30 [01:49<11:34, 25.73s/it] 13%|█▎        | 4/30 [01:53<07:20, 16.94s/it]                                               13%|█▎        | 4/30 [01:53<07:20, 16.94s/it] 17%|█▋        | 5/30 [01:56<05:01, 12.08s/it]                                               17%|█▋        | 5/30 [01:56<05:01, 12.08s/it] 20%|██        | 6/30 [02:00<03:39,  9.15s/it]                                               20%|██        | 6/30 [02:00<03:39,  9.15s/it] 23%|██▎       | 7/30 [02:03<02:47,  7.29s/it]                                               23%|██▎       | 7/30 [02:03<02:47,  7.29s/it] 27%|██▋       | 8/30 [02:07<02:13,  6.08s/it]                                               27%|██▋       | 8/30 [02:07<02:13,  6.08s/it] 30%|███       | 9/30 [03:33<10:55, 31.21s/it]                                               30%|███       | 9/30 [03:33<10:55, 31.21s/it] 33%|███▎      | 10/30 [03:37<07:32, 22.64s/it]                                                33%|███▎      | 10/30 [03:37<07:32, 22.64s/it] 37%|███▋      | 11/30 [03:40<05:18, 16.77s/it]                                                37%|███▋      | 11/30 [03:40<05:18, 16.77s/it] 40%|████      | 12/30 [03:44<03:49, 12.73s/it]                                                40%|████      | 12/30 [03:44<03:49, 12.73s/it] 43%|████▎     | 13/30 [03:47<02:48,  9.93s/it]                                                43%|████▎     | 13/30 [03:47<02:48,  9.93s/it] 47%|████▋     | 14/30 [03:51<02:07,  7.98s/it]                                                47%|████▋     | 14/30 [03:51<02:07,  7.98s/it] 50%|█████     | 15/30 [03:54<01:39,  6.61s/it]                                                50%|█████     | 15/30 [03:54<01:39,  6.61s/it] 53%|█████▎    | 16/30 [03:57<01:19,  5.67s/it]                                                53%|█████▎    | 16/30 [03:57<01:19,  5.67s/it] 57%|█████▋    | 17/30 [05:16<05:56, 27.44s/it]                                                57%|█████▋    | 17/30 [05:16<05:56, 27.44s/it] 60%|██████    | 18/30 [05:19<04:02, 20.23s/it]                                                60%|██████    | 18/30 [05:19<04:02, 20.23s/it] 63%|██████▎   | 19/30 [05:22<02:47, 15.20s/it]                                                63%|██████▎   | 19/30 [05:22<02:47, 15.20s/it] 67%|██████▋   | 20/30 [05:26<01:57, 11.72s/it]                                                67%|██████▋   | 20/30 [05:26<01:57, 11.72s/it] 70%|███████   | 21/30 [05:30<01:23,  9.25s/it]                                                70%|███████   | 21/30 [05:30<01:23,  9.25s/it] 73%|███████▎  | 22/30 [05:33<01:00,  7.51s/it]                                                73%|███████▎  | 22/30 [05:33<01:00,  7.51s/it] 77%|███████▋  | 23/30 [05:37<00:44,  6.30s/it]                                                77%|███████▋  | 23/30 [05:37<00:44,  6.30s/it] 80%|████████  | 24/30 [05:40<00:32,  5.48s/it]                                                80%|████████  | 24/30 [05:40<00:32,  5.48s/it] 83%|████████▎ | 25/30 [07:08<02:31, 30.28s/it]                                                83%|████████▎ | 25/30 [07:08<02:31, 30.28s/it] 87%|████████▋ | 26/30 [07:12<01:28, 22.24s/it]                                                87%|████████▋ | 26/30 [07:12<01:28, 22.24s/it] 90%|█████████ | 27/30 [07:15<00:49, 16.62s/it]                                                90%|█████████ | 27/30 [07:15<00:49, 16.62s/it] 93%|█████████▎| 28/30 [07:19<00:25, 12.68s/it]                                                93%|█████████▎| 28/30 [07:19<00:25, 12.68s/it] 97%|█████████▋| 29/30 [07:22<00:09,  9.92s/it]                                                97%|█████████▋| 29/30 [07:22<00:09,  9.92s/it]100%|██████████| 30/30 [07:26<00:00,  7.98s/it]                                               100%|██████████| 30/30 [07:26<00:00,  7.98s/it]                                               100%|██████████| 30/30 [07:27<00:00,  7.98s/it]100%|██████████| 30/30 [07:27<00:00, 14.92s/it]
+  [001] ROLLOUT #01 | reward=0.3101 | std=0.1029 | tool_freq=9.38 | env_steps=9.4 | complete=0.00 | raw=0.6767 | seqs=6/8 | rewards=[0.3914,0.3936,0.1506,0.3113,0.3298,0.3618,0.1506,0.3914] | rolling10=0.3101 | loss=-0.0277
+{'loss': '-0.02774', 'grad_norm': '0.133', 'learning_rate': '1e-06', 'num_tokens': '7605', 'completions/mean_length': '165.6', 'completions/min_length': '81', 'completions/max_length': '195', 'completions/clipped_ratio': '0.625', 'completions/mean_terminated_length': '119.3', 'completions/min_terminated_length': '81', 'completions/max_terminated_length': '195', 'tools/call_frequency': '9.375', 'tools/failure_frequency': '0', 'rewards/reward_func/mean': '0.3101', 'rewards/reward_func/std': '0.1029', 'reward': '0.3101', 'reward_std': '0.1029', 'frac_reward_zero_std': '0', 'kl': '0.001767', 'entropy': '0.7666', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01571', 'clip_ratio/high_max': '0.01571', 'clip_ratio/region_mean': '0.01571', 'step_time': '102.6', 'epoch': '0.001953'}
+  [002] grad-only | loss=0.0972
+{'loss': '0.09718', 'grad_norm': '0.557', 'learning_rate': '9.667e-07', 'kl': '0.002401', 'entropy': '0.542', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0', 'step_time': '3.191', 'epoch': '0.003906'}
+  [003] grad-only | loss=0.0943
+{'loss': '0.09428', 'grad_norm': '0.5795', 'learning_rate': '9.333e-07', 'kl': '0.001706', 'entropy': '0.5162', 'clip_ratio/low_mean': '0.02469', 'clip_ratio/low_min': '0.02469', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.02469', 'step_time': '3.193', 'epoch': '0.005859'}
+  [004] grad-only | loss=-0.0018
+{'loss': '-0.001757', 'grad_norm': '0.007689', 'learning_rate': '9e-07', 'kl': '0.003567', 'entropy': '0.7567', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.02062', 'clip_ratio/high_max': '0.02062', 'clip_ratio/region_mean': '0.02062', 'step_time': '3.191', 'epoch': '0.007812'}
+  [005] grad-only | loss=-0.1162
+{'loss': '-0.1162', 'grad_norm': '0.5426', 'learning_rate': '8.667e-07', 'kl': '0.002226', 'entropy': '0.7579', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.03093', 'clip_ratio/high_max': '0.03093', 'clip_ratio/region_mean': '0.03093', 'step_time': '3.193', 'epoch': '0.009766'}
+  [006] grad-only | loss=-0.1149
+{'loss': '-0.1149', 'grad_norm': '0.5383', 'learning_rate': '8.333e-07', 'kl': '0.004424', 'entropy': '0.755', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.02062', 'clip_ratio/high_max': '0.02062', 'clip_ratio/region_mean': '0.02062', 'step_time': '3.195', 'epoch': '0.01172'}
+  [007] grad-only | loss=-0.1191
+{'loss': '-0.1191', 'grad_norm': '0.5262', 'learning_rate': '8e-07', 'kl': '0.002883', 'entropy': '0.764', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.03093', 'clip_ratio/high_max': '0.03093', 'clip_ratio/region_mean': '0.03093', 'step_time': '3.213', 'epoch': '0.01367'}
+  [008] grad-only | loss=-0.0744
+{'loss': '-0.07436', 'grad_norm': '0.3345', 'learning_rate': '7.667e-07', 'kl': '0.002573', 'entropy': '0.8219', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01538', 'clip_ratio/high_max': '0.01538', 'clip_ratio/region_mean': '0.01538', 'step_time': '3.203', 'epoch': '0.01562'}
+  [009] ROLLOUT #02 | reward=0.2463 | std=0.1091 | tool_freq=7.75 | env_steps=7.8 | complete=0.00 | raw=0.6670 | seqs=5/8 | rewards=[0.1457,0.3869,0.3472,0.1457,0.3312,0.1457,0.3221,0.1457] | rolling10=0.2782 | loss=-0.2238
+{'loss': '-0.2238', 'grad_norm': '1.084', 'learning_rate': '7.333e-07', 'num_tokens': '1.5e+04', 'completions/mean_length': '139.1', 'completions/min_length': '82', 'completions/max_length': '199', 'completions/clipped_ratio': '0.375', 'completions/mean_terminated_length': '104.6', 'completions/min_terminated_length': '82', 'completions/max_terminated_length': '195', 'tools/call_frequency': '7.75', 'tools/failure_frequency': '0', 'rewards/reward_func/mean': '0.2463', 'rewards/reward_func/std': '0.1091', 'reward': '0.2463', 'reward_std': '0.1091', 'frac_reward_zero_std': '0', 'kl': '0.003481', 'entropy': '0.7915', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01031', 'clip_ratio/high_max': '0.01031', 'clip_ratio/region_mean': '0.01031', 'step_time': '86.2', 'epoch': '0.01758'}
+  [010] grad-only | loss=0.0679
+{'loss': '0.06789', 'grad_norm': '0.4378', 'learning_rate': '7e-07', 'kl': '0.001681', 'entropy': '0.6429', 'clip_ratio/low_mean': '0.0122', 'clip_ratio/low_min': '0.0122', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.0122', 'step_time': '3.178', 'epoch': '0.01953'}
+  [011] grad-only | loss=-0.1234
+{'loss': '-0.1234', 'grad_norm': '0.5123', 'learning_rate': '6.667e-07', 'kl': '0.002698', 'entropy': '0.8193', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01005', 'clip_ratio/high_max': '0.01005', 'clip_ratio/region_mean': '0.01005', 'step_time': '3.192', 'epoch': '0.02148'}
+  [012] grad-only | loss=0.0676
+{'loss': '0.06759', 'grad_norm': '0.2829', 'learning_rate': '6.333e-07', 'kl': '0.001954', 'entropy': '0.6393', 'clip_ratio/low_mean': '0.03659', 'clip_ratio/low_min': '0.03659', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.03659', 'step_time': '3.198', 'epoch': '0.02344'}
+  [013] grad-only | loss=-0.1629
+{'loss': '-0.1629', 'grad_norm': '0.6995', 'learning_rate': '6e-07', 'kl': '0.003093', 'entropy': '0.8095', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.02051', 'clip_ratio/high_max': '0.02051', 'clip_ratio/region_mean': '0.02051', 'step_time': '3.207', 'epoch': '0.02539'}
+  [014] grad-only | loss=0.0674
+{'loss': '0.06736', 'grad_norm': '0.2523', 'learning_rate': '5.667e-07', 'kl': '0.001575', 'entropy': '0.6402', 'clip_ratio/low_mean': '0.03659', 'clip_ratio/low_min': '0.03659', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.03659', 'step_time': '3.178', 'epoch': '0.02734'}
+  [015] grad-only | loss=-0.1387
+{'loss': '-0.1387', 'grad_norm': '0.6379', 'learning_rate': '5.333e-07', 'kl': '0.001737', 'entropy': '0.7502', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.03046', 'clip_ratio/high_max': '0.03046', 'clip_ratio/region_mean': '0.03046', 'step_time': '3.192', 'epoch': '0.0293'}
+  [016] grad-only | loss=0.0679
+{'loss': '0.06793', 'grad_norm': '0.5122', 'learning_rate': '5e-07', 'kl': '0.004277', 'entropy': '0.6576', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0', 'step_time': '3.174', 'epoch': '0.03125'}
+  [017] ROLLOUT #03 | reward=0.2347 | std=0.1246 | tool_freq=6.62 | env_steps=6.6 | complete=0.00 | raw=0.7139 | seqs=2/8 | rewards=[0.1444,0.1444,0.3852,0.1444,0.3852,0.1444,0.1444,0.3852] | rolling10=0.2637 | loss=0.0590
+       action_sequences: 5x route_to_a route_to_b route_to_c shed_load || 3x route_to_a route_to_b route_to_c shed_load route_to_a route_to_b route_to_c shed_load route_to_a route_to_b route_to_c
+{'loss': '0.059', 'grad_norm': '0.1801', 'learning_rate': '4.667e-07', 'num_tokens': '2.226e+04', 'completions/mean_length': '123.1', 'completions/min_length': '81', 'completions/max_length': '193', 'completions/clipped_ratio': '0.375', 'completions/mean_terminated_length': '81.2', 'completions/min_terminated_length': '81', 'completions/max_terminated_length': '82', 'tools/call_frequency': '6.625', 'tools/failure_frequency': '0', 'rewards/reward_func/mean': '0.2347', 'rewards/reward_func/std': '0.1246', 'reward': '0.2347', 'reward_std': '0.1246', 'frac_reward_zero_std': '0', 'kl': '0.005106', 'entropy': '0.6394', 'clip_ratio/low_mean': '0.04938', 'clip_ratio/low_min': '0.04938', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.04938', 'step_time': '77.77', 'epoch': '0.0332'}
+  [018] grad-only | loss=-0.2352
+{'loss': '-0.2352', 'grad_norm': '1.101', 'learning_rate': '4.333e-07', 'kl': '0.003957', 'entropy': '0.7013', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01036', 'clip_ratio/high_max': '0.01036', 'clip_ratio/region_mean': '0.01036', 'step_time': '3.214', 'epoch': '0.03516'}
+  [019] grad-only | loss=0.0601
+{'loss': '0.06015', 'grad_norm': '0.2576', 'learning_rate': '4e-07', 'kl': '0.006664', 'entropy': '0.6299', 'clip_ratio/low_mean': '0.02469', 'clip_ratio/low_min': '0.02469', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.02469', 'step_time': '3.203', 'epoch': '0.03711'}
+  [020] grad-only | loss=-0.2367
+{'loss': '-0.2367', 'grad_norm': '1.126', 'learning_rate': '3.667e-07', 'kl': '0.002865', 'entropy': '0.7032', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01036', 'clip_ratio/high_max': '0.01036', 'clip_ratio/region_mean': '0.01036', 'step_time': '3.323', 'epoch': '0.03906'}
+  [021] grad-only | loss=-0.2356
+{'loss': '-0.2356', 'grad_norm': '0.9593', 'learning_rate': '3.333e-07', 'kl': '0.004347', 'entropy': '0.7101', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.02073', 'clip_ratio/high_max': '0.02073', 'clip_ratio/region_mean': '0.02073', 'step_time': '3.224', 'epoch': '0.04102'}
+  [022] grad-only | loss=0.0598
+{'loss': '0.05982', 'grad_norm': '0.5463', 'learning_rate': '3e-07', 'kl': '0.008474', 'entropy': '0.6361', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0', 'step_time': '3.18', 'epoch': '0.04297'}
+  [023] grad-only | loss=0.0609
+{'loss': '0.0609', 'grad_norm': '0.4211', 'learning_rate': '2.667e-07', 'kl': '0.01241', 'entropy': '0.6558', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0', 'step_time': '3.18', 'epoch': '0.04492'}
+  [024] grad-only | loss=0.0600
+{'loss': '0.05995', 'grad_norm': '0.4359', 'learning_rate': '2.333e-07', 'kl': '0.009528', 'entropy': '0.6337', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0', 'step_time': '3.285', 'epoch': '0.04688'}
+  [025] ROLLOUT #04 | reward=0.2627 | std=0.1291 | tool_freq=7.62 | env_steps=7.6 | complete=0.00 | raw=0.7006 | seqs=4/8 | rewards=[0.4134,0.3425,0.1442,0.3557,0.1442,0.1442,0.4134,0.1442] | rolling10=0.2634 | loss=0.0674
+{'loss': '0.06737', 'grad_norm': '0.3642', 'learning_rate': '2e-07', 'num_tokens': '2.964e+04', 'completions/mean_length': '137.2', 'completions/min_length': '81', 'completions/max_length': '195', 'completions/clipped_ratio': '0.375', 'completions/mean_terminated_length': '104.4', 'completions/min_terminated_length': '81', 'completions/max_terminated_length': '195', 'tools/call_frequency': '7.625', 'tools/failure_frequency': '0', 'rewards/reward_func/mean': '0.2627', 'rewards/reward_func/std': '0.1291', 'reward': '0.2627', 'reward_std': '0.1291', 'frac_reward_zero_std': '0', 'kl': '0.003059', 'entropy': '0.6404', 'clip_ratio/low_mean': '0.01235', 'clip_ratio/low_min': '0.01235', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.01235', 'step_time': '87.83', 'epoch': '0.04883'}
+  [026] grad-only | loss=0.0696
+{'loss': '0.06955', 'grad_norm': '0.6269', 'learning_rate': '1.667e-07', 'kl': '0.003013', 'entropy': '0.6498', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0', 'step_time': '3.208', 'epoch': '0.05078'}
+  [027] grad-only | loss=-0.1241
+{'loss': '-0.1241', 'grad_norm': '0.5469', 'learning_rate': '1.333e-07', 'kl': '0.002544', 'entropy': '0.775', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.01579', 'clip_ratio/high_max': '0.01579', 'clip_ratio/region_mean': '0.01579', 'step_time': '3.215', 'epoch': '0.05273'}
+  [028] grad-only | loss=-0.1088
+{'loss': '-0.1088', 'grad_norm': '0.4501', 'learning_rate': '1e-07', 'kl': '0.002641', 'entropy': '0.8172', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.02051', 'clip_ratio/high_max': '0.02051', 'clip_ratio/region_mean': '0.02051', 'step_time': '3.199', 'epoch': '0.05469'}
+  [029] grad-only | loss=0.0680
+{'loss': '0.068', 'grad_norm': '0.2539', 'learning_rate': '6.667e-08', 'kl': '0.002162', 'entropy': '0.6527', 'clip_ratio/low_mean': '0.02439', 'clip_ratio/low_min': '0.02439', 'clip_ratio/high_mean': '0', 'clip_ratio/high_max': '0', 'clip_ratio/region_mean': '0.02439', 'step_time': '3.199', 'epoch': '0.05664'}
+  [030] grad-only | loss=-0.2054
+{'loss': '-0.2054', 'grad_norm': '0.9051', 'learning_rate': '3.333e-08', 'kl': '0.002798', 'entropy': '0.7039', 'clip_ratio/low_mean': '0', 'clip_ratio/low_min': '0', 'clip_ratio/high_mean': '0.02591', 'clip_ratio/high_max': '0.02591', 'clip_ratio/region_mean': '0.02591', 'step_time': '3.201', 'epoch': '0.05859'}
+{'train_runtime': '447.7', 'train_samples_per_second': '0.067', 'train_steps_per_second': '0.067', 'train_loss': '-0.04272', 'epoch': '0.05859'}
+
+[END] Merging LoRA into base model and saving to trained_models/grpo_Qwen_Qwen3-0.6B ...
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  1.91it/s]Writing model shards: 100%|██████████| 1/1 [00:00<00:00,  1.91it/s]
+[END] ✅ Saved. Load with: AutoModelForCausalLM.from_pretrained('trained_models/grpo_Qwen_Qwen3-0.6B')
+
+====================================================================
+LEARNING EXPERIMENT — VERDICT
+====================================================================
+Grad steps completed : 30/30
+Rollout steps        : 4
+Elapsed              : 7.6 min
+
+Reward summary:
+  First-quarter mean : 0.3101
+  Last-quarter  mean : 0.2627
+  Delta (improvement): -0.0473
+  Overall mean       : 0.2634
+  Avg tool_call_freq : 7.844
+  Avg env_steps      : 7.84
+  Avg completion_rate: 0.000
+
+Heuristic baseline   : ~0.60-0.65 (from environment benchmark)
+Random agent         : ~0.15-0.20
+
+❌ VERDICT: NOT LEARNING
+   Reward trended downward. Possible causes:
+   - lr too high (try 5e-7)
+   - too few tool calls (model not generating tool syntax reliably)
+   - environment reward too sparse
+====================================================================

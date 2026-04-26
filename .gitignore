@@ -8,11 +8,13 @@ __pycache__/
 .env
 .hf_private/
 .windsurf/
+.matplotlib/
 .DS_Store
 *.egg-info/
 dist/
 build/
 *.png
+!figures/budget_router_evidence.png
 ._*
 merged_codebase.txt
 docs/
