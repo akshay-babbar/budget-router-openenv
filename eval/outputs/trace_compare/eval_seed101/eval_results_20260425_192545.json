@@ -1,0 +1,149 @@
+{
+  "metadata": {
+    "timestamp": "20260425_192545",
+    "policies": [
+      "heuristic",
+      "llm"
+    ],
+    "tasks": [
+      "hard_multi"
+    ],
+    "seeds": [
+      101
+    ]
+  },
+  "summary": {
+    "hard_multi|heuristic": {
+      "grader_mean": 0.6753,
+      "reward_mean": 3.4091,
+      "success_rate": 0.8,
+      "adaptation": 0.7857,
+      "n": 1
+    },
+    "hard_multi|llm": {
+      "grader_mean": 0.7038,
+      "reward_mean": 6.4091,
+      "success_rate": 0.8889,
+      "adaptation": 0.9,
+      "n": 1
+    }
+  },
+  "episodes": [
+    {
+      "task": "hard_multi",
+      "seed": 101,
+      "policy": "heuristic",
+      "total_reward": 3.4091,
+      "grader_score": 0.6753,
+      "success_score": 0.8,
+      "budget_score": 0.0818,
+      "adaptation_score": 0.7857,
+      "latency_score": 0.5795,
+      "sla_score": 1.0,
+      "success_rate": 0.8,
+      "steps": 20,
+      "actions": [
+        "route_to_a",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_c"
+      ],
+      "rewards": [
+        -2.0454545454545454,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        -2.2272727272727275,
+        0.7727272727272727,
+        -2.2272727272727275,
+        0.7727272727272727,
+        -2.2272727272727275,
+        0.5454545454545454
+      ]
+    },
+    {
+      "task": "hard_multi",
+      "seed": 101,
+      "policy": "llm",
+      "total_reward": 6.4091,
+      "grader_score": 0.7038,
+      "success_score": 0.8,
+      "budget_score": 0.0818,
+      "adaptation_score": 0.9,
+      "latency_score": 0.6076,
+      "sla_score": 1.0,
+      "success_rate": 0.8889,
+      "steps": 20,
+      "actions": [
+        "route_to_a",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_b",
+        "route_to_c",
+        "route_to_c",
+        "route_to_c",
+        "shed_load",
+        "shed_load"
+      ],
+      "rewards": [
+        -2.0454545454545454,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        0.7727272727272727,
+        -2.2272727272727275,
+        0.5454545454545454,
+        0.5454545454545454,
+        0.5454545454545454,
+        -0.5,
+        -0.5
+      ]
+    }
+  ]
+}

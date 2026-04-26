@@ -366,6 +366,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "gradio" },
+    { name = "huggingface-hub" },
     { name = "jmespath" },
     { name = "openai" },
     { name = "openenv-core" },
@@ -410,6 +411,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.110,<1.0" },
     { name = "gradio", specifier = ">=5.0,<6.0" },
     { name = "gymnasium", marker = "extra == 'training'", specifier = ">=1.0.0,<2.0" },
+    { name = "huggingface-hub", specifier = ">=1.12.0" },
     { name = "huggingface-hub", marker = "extra == 'grpo'", specifier = ">=1.5.0" },
     { name = "jmespath", specifier = ">=1.1.0" },
     { name = "openai", specifier = ">=1.0,<2.0" },

@@ -60,7 +60,7 @@ def build_app() -> gr.Blocks:
 
         gr.Markdown(
             "# Budget Router — Policy Comparison\n"
-            "_Select 2 policies · start episode · step or fast-forward · compare outcomes_"
+            "_Select 2 policies · start episode · step or finish episode · compare outcomes_"
         )
 
         with gr.Row():
