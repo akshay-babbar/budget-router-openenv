@@ -60,14 +60,14 @@ to require RL/in-context reasoning and learnable enough to reward it.
 **Enable LLM policy locally**:
 
 ```bash
-export API_BASE_URL="https://<openai-compatible-endpoint>/v1"  # e.g. https://router.huggingface.co/v1
+export API_BASE_URL="https://<openai-compatible-endpoint>/v1"  # e.g. L=https://router.huggingface.co/v1
 export API_KEY="<your_key>"
-export MODEL_NAME="<model_id>"  # optional (e.g. Qwen/Qwen2.5-72B-Instruct)
+export MODEL_NAME="<model_id>"  # optional (e.g. "Qwen/Qwen2.5-72B-Instruct")
 ```
 
 
 ```bash
-uv sync
+uv sync --extra training
 uv run server
 ```
 
