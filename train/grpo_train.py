@@ -37,9 +37,11 @@ EVALUATION
 DESIGN DECISIONS (world-class RL conventions)
     • max_completion_length=3072: allows full 20-step episodes (critical fix)
     • num_generations=8: better GRPO variance estimate (GRPO gradient ∝ advantage)
-    • temperature=1.0: standard GRPO exploration temperature
-    • beta=0.04: moderate KL penalty — prevents mode collapse while allowing
-      policy improvement (DeepSeek-R1 uses 0.001-0.04 depending on stage)
+    • temperature=1.5: elevated from 1.0 because smoke test showed entropy
+      collapse (0.003-0.03) with all 8 generations producing identical sequences.
+      Higher temp forces exploration diversity in the GRPO group.
+    • beta=0.01: lowered from 0.04 because smoke test showed KL ≈ 0.0001-0.0004.
+      The model barely drifts from base — low beta allows faster policy movement.
     • LoRA r=16 on q/k/v/o_proj: sufficient capacity for policy learning
     • reward = grade_episode()["overall_score"] for complete episodes,
       scaled partial credit for incomplete (encourages full-episode completion)
@@ -258,6 +260,8 @@ def main():
     parser.add_argument("--hub-private", action="store_true")
     parser.add_argument("--dataset-n", type=int, default=None, help="Override dataset size.")
     parser.add_argument("--max-steps", type=int, default=None, help="Override max training steps.")
+    parser.add_argument("--temperature", type=float, default=1.5, help="Sampling temperature (default 1.5, elevated for exploration).")
+    parser.add_argument("--beta", type=float, default=0.01, help="KL penalty coefficient (default 0.01).")
     cli = parser.parse_args()
 
     if cli.smoke and cli.full:
@@ -333,9 +337,9 @@ def main():
         generation_batch_size=8,              # Generate all at once
         max_completion_length=3072,           # CRITICAL FIX: was 1024
         max_tool_calling_iterations=25,       # Buffer above 20 steps
-        temperature=1.0,                      # Standard GRPO exploration
+        temperature=cli.temperature,          # 1.5: force exploration (smoke showed entropy collapse at 1.0)
         top_p=1.0,
-        beta=0.04,                            # Moderate KL penalty
+        beta=cli.beta,                        # 0.01: allow policy drift (smoke showed KL ≈ 0.0001)
         learning_rate=5e-6,                   # Standard GRPO lr (DeepSeek-R1)
         warmup_ratio=0.05,
         lr_scheduler_type="cosine",

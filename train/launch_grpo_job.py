@@ -75,6 +75,8 @@ def main() -> None:
         "--warm-start-from", default=None,
         help="Hub repo id of SFT model for warm start.",
     )
+    parser.add_argument("--temperature", type=float, default=None, help="Override sampling temperature.")
+    parser.add_argument("--beta", type=float, default=None, help="Override KL penalty beta.")
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN") or get_token()
@@ -96,6 +98,11 @@ def main() -> None:
 
     if args.warm_start_from:
         train_args += f" --warm-start-from {args.warm_start_from}"
+
+    if args.temperature is not None:
+        train_args += f" --temperature {args.temperature}"
+    if args.beta is not None:
+        train_args += f" --beta {args.beta}"
 
     api.create_repo(repo_id=hub_repo, repo_type="model", exist_ok=True)
 
