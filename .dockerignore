@@ -14,7 +14,8 @@ docs/*.png
 .hf_private/
 .DS_Store
 artifacts/
-*.zip
+# Root-only: do not use *.zip — that excludes trained_models/ppo_hard_multi_100k.zip from the HF Space image.
+/*.zip
 *.json
 **/*.json
 *.txt
@@ -25,4 +26,6 @@ README_archived.md
 llm_stderr.log
 pre_validation.sh
 test_docker_step.sh
-trained_models/
+# Exclude heavy local checkpoints under trained_models/, but keep the bundled SB3 zip for Gradio PPO.
+trained_models/**
+!trained_models/ppo_hard_multi_100k.zip
