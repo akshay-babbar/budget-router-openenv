@@ -7,6 +7,8 @@ PURPOSE
     NOT for actual learning — 10 steps is statistical noise.
 
 USAGE
+    Requires optional GRPO deps (`uv sync --extra grpo`), then e.g.:
+
     PYTORCH_ENABLE_MPS_FALLBACK=1 uv run python train/smoke_test.py
 
 EXPECTED RUNTIME
@@ -38,11 +40,23 @@ os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 # Suppress tokenizer parallelism warnings
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-import torch
-from datasets import Dataset
-from peft import LoraConfig
-from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
-from trl import GRPOConfig, GRPOTrainer
+try:
+    import torch
+    from datasets import Dataset
+    from peft import LoraConfig
+    from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback
+    from trl import GRPOConfig, GRPOTrainer
+except ModuleNotFoundError as exc:
+    name = getattr(exc, "name", None) or str(exc)
+    print(
+        "\nGRPO smoke test requires optional packages (torch, datasets, trl, …).\n"
+        f"Missing: {name}\n\n"
+        "Install with:\n"
+        "  uv sync --extra grpo\n\n"
+        "Then re-run this script.\n",
+        file=sys.stderr,
+    )
+    raise SystemExit(1) from exc
 
 from budget_router.reward import grade_episode
 from train.grpo_env import BudgetRouterGRPOEnv
@@ -180,8 +194,8 @@ def main():
         per_device_train_batch_size=1,
         gradient_accumulation_steps=1,
         num_generations=4,              # min for GRPO; use 8 for real runs
-        max_prompt_length=256,
-        max_completion_length=512,      # ~10 multi-turn tool-call turns
+        generation_batch_size=4,      # TRL 1.x: must be divisible by num_generations (see learn_experiment.py)
+        max_completion_length=512,    # ~10 multi-turn tool-call turns
         temperature=1.0,                # diverse exploration (DeepSeek-R1)
         beta=0.001,                     # KL penalty; small for verifiable tasks
         learning_rate=5e-7,             # conservative; real training: 1e-6
