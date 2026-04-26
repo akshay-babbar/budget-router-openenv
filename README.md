@@ -67,7 +67,7 @@ export MODEL_NAME="<model_id>"  # optional (e.g. Qwen/Qwen2.5-72B-Instruct)
 
 
 ```bash
-uv sync
+uv sync --extra training
 uv run server
 ```
 

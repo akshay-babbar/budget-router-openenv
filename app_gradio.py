@@ -20,6 +20,8 @@ from gradio_ui.renderers import (
     render_incident_timeline,
     render_side_panel,
     render_grader_plot,
+    MISSION_SCORE_HELP,
+    MISSION_SCORE_LABEL,
     _GRADER_PENDING,
     _PROVIDER_EMPTY,
     render_history_table_compare,
@@ -131,7 +133,7 @@ def build_app() -> gr.Blocks:
                     fast_btn = gr.Button("⚡ Fast-forward", interactive=False)
                     finish_btn = gr.Button("⏩ Finish Episode", interactive=False)
 
-        gr.Markdown("### Grader score (comparison)")
+        gr.Markdown(f"### {MISSION_SCORE_LABEL} (comparison)\n_{MISSION_SCORE_HELP}_")
         grader_plot = gr.Plot()
 
         with gr.Row(elem_classes=["episode-history-row"]):
@@ -144,10 +146,10 @@ def build_app() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column(scale=1):
-                left_grade_title = gr.Markdown("### Episode Grade — Policy A")
+                left_grade_title = gr.Markdown(f"### {MISSION_SCORE_LABEL} — Policy A")
                 left_grade = gr.HTML(_GRADER_PENDING())
             with gr.Column(scale=1):
-                right_grade_title = gr.Markdown("### Episode Grade — Policy B")
+                right_grade_title = gr.Markdown(f"### {MISSION_SCORE_LABEL} — Policy B")
                 right_grade = gr.HTML(_GRADER_PENDING())
 
         gr.Markdown("### Incident Timeline")
@@ -160,7 +162,12 @@ def build_app() -> gr.Blocks:
             scenario_name = str(run.get("scenario", "easy") or "easy")
             l_out = _render_side(ls, run, scenario_name)
             r_out = _render_side(rs, run, scenario_name)
-            plot = render_grader_plot(ls.get("history", []) or [], rs.get("history", []) or [])
+            plot = render_grader_plot(
+                ls.get("history", []) or [],
+                rs.get("history", []) or [],
+                left_name=str(ls.get("policy_name") or ""),
+                right_name=str(rs.get("policy_name") or ""),
+            )
             incidents = render_incident_timeline(scenario_name)
 
             running = bool(run.get("running", False))
@@ -243,8 +250,8 @@ def build_app() -> gr.Blocks:
                 f"## {right_name}",
                 f"### Step History — {left_name}",
                 f"### Step History — {right_name}",
-                f"### Episode Grade — {left_name}",
-                f"### Episode Grade — {right_name}",
+                f"### {MISSION_SCORE_LABEL} — {left_name}",
+                f"### {MISSION_SCORE_LABEL} — {right_name}",
             )
 
         left_policy.change(
