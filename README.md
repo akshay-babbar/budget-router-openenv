@@ -74,6 +74,10 @@ uv run server
 Then open `http://127.0.0.1:8000/web` for the Gradio dashboard.
 
 
+
+To **reproduce or regenerate** the evaluation numbers, traces, PPO workflow, and optional GRPO checks, follow the command checklist in [`REPRODUCIBILITY.md`](REPRODUCIBILITY.md) (companion to the optional `<details>` blocks below).
+
+
 ## Benchmark results
 
 Three policies evaluated:
@@ -124,6 +128,13 @@ so deltas are paired):
 | **Heldout** | 100–109 | 0.6064 ± 0.0419 | 0.6454 ± 0.0497 | **+0.0390 (+6.4 %)** | **8 / 2 / 0** |
 | **Fresh** | 200–209 | 0.6086 ± 0.0314 | 0.6347 ± 0.0551 | **+0.0261 (+4.3 %)** | **8 / 0 / 2** |
 | **Combined non-dev** | 100–109 + 200–209 | 0.6075 | 0.6401 | **+0.0326 (+5.4 %)** | **16 / 2 / 2** |
+
+![Budget Router Evidence](figures/budget_router_evidence.png)
+*Figure: (top-left) LLM advantage grows with task difficulty; (top-right) 
+three-policy ordering on Hard_Multi with non-overlapping 95% CIs; 
+(bottom-left) generalization across independent seed buckets including 
+post-freeze fresh seeds; (bottom-right) adaptation sub-score is the 
+primary driver of LLM and PPO gains over the reactive heuristic.*
 
 The fresh-seed bucket (200–209) was added *after* the LLM prompt and budget
 guard were frozen. It exists specifically to falsify a "tuned-on-heldout"

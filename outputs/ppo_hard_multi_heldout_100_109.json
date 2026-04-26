@@ -1,0 +1,221 @@
+{
+  "timestamp": "20260426_012049",
+  "seed_set": "heldout_100_109",
+  "seeds": [
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109
+  ],
+  "ppo_mean": 0.69462,
+  "ppo_ci": [
+    0.6684638106400493,
+    0.7207761893599507
+  ],
+  "heu_mean": 0.60643,
+  "heu_ci": [
+    0.5764600402861199,
+    0.6363999597138802
+  ],
+  "delta": 0.08818999999999999,
+  "delta_pct": 14.542486354566888,
+  "win_rate": 1.0,
+  "episodes": [
+    {
+      "seed": 100,
+      "ppo": {
+        "overall_score": 0.6554,
+        "success_score": 0.65,
+        "latency_score": 0.5948,
+        "budget_score": 0.0909,
+        "sla_score": 1.0,
+        "adaptation_score": 0.8889
+      },
+      "heuristic": {
+        "overall_score": 0.5459,
+        "success_score": 0.6,
+        "latency_score": 0.4399,
+        "budget_score": 0.0909,
+        "sla_score": 0.9474,
+        "adaptation_score": 0.6111
+      }
+    },
+    {
+      "seed": 101,
+      "ppo": {
+        "overall_score": 0.7024,
+        "success_score": 0.7,
+        "latency_score": 0.6096,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 1.0
+      },
+      "heuristic": {
+        "overall_score": 0.6753,
+        "success_score": 0.8,
+        "latency_score": 0.5795,
+        "budget_score": 0.0818,
+        "sla_score": 1.0,
+        "adaptation_score": 0.7857
+      }
+    },
+    {
+      "seed": 102,
+      "ppo": {
+        "overall_score": 0.7372,
+        "success_score": 0.75,
+        "latency_score": 0.7087,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 1.0
+      },
+      "heuristic": {
+        "overall_score": 0.6228,
+        "success_score": 0.7,
+        "latency_score": 0.5593,
+        "budget_score": 0.0818,
+        "sla_score": 1.0,
+        "adaptation_score": 0.6932
+      }
+    },
+    {
+      "seed": 103,
+      "ppo": {
+        "overall_score": 0.664,
+        "success_score": 0.65,
+        "latency_score": 0.5893,
+        "budget_score": 0.0909,
+        "sla_score": 1.0,
+        "adaptation_score": 0.9375
+      },
+      "heuristic": {
+        "overall_score": 0.6003,
+        "success_score": 0.65,
+        "latency_score": 0.4991,
+        "budget_score": 0.0364,
+        "sla_score": 1.0,
+        "adaptation_score": 0.75
+      }
+    },
+    {
+      "seed": 104,
+      "ppo": {
+        "overall_score": 0.7237,
+        "success_score": 0.75,
+        "latency_score": 0.6412,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 1.0
+      },
+      "heuristic": {
+        "overall_score": 0.6432,
+        "success_score": 0.7,
+        "latency_score": 0.5509,
+        "budget_score": 0.2727,
+        "sla_score": 1.0,
+        "adaptation_score": 0.6607
+      }
+    },
+    {
+      "seed": 105,
+      "ppo": {
+        "overall_score": 0.6507,
+        "success_score": 0.6,
+        "latency_score": 0.6263,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 0.875
+      },
+      "heuristic": {
+        "overall_score": 0.5453,
+        "success_score": 0.65,
+        "latency_score": 0.4287,
+        "budget_score": 0.0455,
+        "sla_score": 0.9,
+        "adaptation_score": 0.6136
+      }
+    },
+    {
+      "seed": 106,
+      "ppo": {
+        "overall_score": 0.7334,
+        "success_score": 0.75,
+        "latency_score": 0.6899,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 1.0
+      },
+      "heuristic": {
+        "overall_score": 0.6371,
+        "success_score": 0.7,
+        "latency_score": 0.5459,
+        "budget_score": 0.2364,
+        "sla_score": 1.0,
+        "adaptation_score": 0.6625
+      }
+    },
+    {
+      "seed": 107,
+      "ppo": {
+        "overall_score": 0.7352,
+        "success_score": 0.75,
+        "latency_score": 0.6987,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 1.0
+      },
+      "heuristic": {
+        "overall_score": 0.6182,
+        "success_score": 0.7,
+        "latency_score": 0.5294,
+        "budget_score": 0.1545,
+        "sla_score": 0.95,
+        "adaptation_score": 0.6833
+      }
+    },
+    {
+      "seed": 108,
+      "ppo": {
+        "overall_score": 0.6528,
+        "success_score": 0.6,
+        "latency_score": 0.6028,
+        "budget_score": 0.1364,
+        "sla_score": 1.0,
+        "adaptation_score": 0.9091
+      },
+      "heuristic": {
+        "overall_score": 0.577,
+        "success_score": 0.6,
+        "latency_score": 0.4813,
+        "budget_score": 0.0909,
+        "sla_score": 0.9444,
+        "adaptation_score": 0.7273
+      }
+    },
+    {
+      "seed": 109,
+      "ppo": {
+        "overall_score": 0.6914,
+        "success_score": 0.7,
+        "latency_score": 0.66,
+        "budget_score": 0.0909,
+        "sla_score": 1.0,
+        "adaptation_score": 0.9286
+      },
+      "heuristic": {
+        "overall_score": 0.5992,
+        "success_score": 0.7,
+        "latency_score": 0.4875,
+        "budget_score": 0.0636,
+        "sla_score": 1.0,
+        "adaptation_score": 0.6607
+      }
+    }
+  ]
+}

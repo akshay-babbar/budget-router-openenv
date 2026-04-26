@@ -1,0 +1,21 @@
+====================================================================
+GRPO Learning Experiment — Budget Router
+====================================================================
+Device   : MPS
+Model    : Qwen/Qwen3-1.7B
+Steps    : 24
+Prompt   : explore
+Sampling : temperature=1.2 top_p=0.95
+Torch    : 2.11.0
+====================================================================
+
+Loading model...
+Loading weights:   0%|          | 0/311 [00:00<?, ?it/s]Loading weights: 100%|██████████| 311/311 [00:00<00:00, 22765.69it/s]
+/Users/akshaybabbar/Desktop/work/meta-hackathon-openenv/budget-router-openenv/train/learn_experiment.py:381: UserWarning: You are using 'environment_factory', which is an experimental feature. This API may change or be removed at any time without prior notice. Silence this warning by setting environment variable TRL_EXPERIMENTAL_SILENCE=1.
+  trainer = GRPOTrainer(
+[transformers] The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'bos_token_id': None, 'pad_token_id': 151643}.
+
+Starting experiment (Ctrl+C to stop early — partial results still printed)...
+
+  0%|          | 0/24 [00:00<?, ?it/s]/Users/akshaybabbar/Desktop/work/meta-hackathon-openenv/budget-router-openenv/.venv/lib/python3.12/site-packages/torch/utils/data/dataloader.py:775: UserWarning: 'pin_memory' argument is set as true but not supported on MPS now, device pinned memory won't be used.
+  super().__init__(loader)
